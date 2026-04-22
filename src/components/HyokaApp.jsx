@@ -329,9 +329,10 @@ const FilterChip = ({ label, active, onClick, grad }) => (
   }}>{label}</button>
 );
 
-const activeFilterCount = (f) => (f.eightType?1:0) + (f.bone?1:0) + (f.color?1:0) + (f.popularity?1:0);
+const activeFilterCount = (f) =>
+  (f.eightType?1:0) + (f.bone?1:0) + (f.color?1:0) + (f.popularity?1:0) + ((f.search||"").trim()?1:0);
 
-// 🆕 人気度判定を「いいね数」ベースに変更
+// 🆕 人気度判定を「いいね数」ベースに変更、🆕 Task D でユーザーネーム検索も追加
 const matchFilter = (post, f) => {
   if (f.eightType && post.analysis?.eightType?.primary !== f.eightType) return false;
   if (f.bone && post.analysis?.bone?.primary !== f.bone) return false;
@@ -342,6 +343,12 @@ const matchFilter = (post, f) => {
       const likes = post.likes || 0;
       if (likes < tier.range[0] || likes > tier.range[1]) return false;
     }
+  }
+  // 🆕 Task D: ユーザーネーム部分一致検索（大文字小文字無視、@も無視）
+  if (f.search && f.search.trim()) {
+    const query = f.search.trim().replace(/^@/, "").toLowerCase();
+    const username = (post.username || "").toLowerCase();
+    if (!username.includes(query)) return false;
   }
   return true;
 };
@@ -371,7 +378,7 @@ const FilterIconButton = ({ count, onClick }) => (
 
 const FilterPanel = ({ filter, onChange, onClose }) => {
   const update = (key, val) => onChange({ ...filter, [key]: filter[key]===val ? null : val });
-  const clearAll = () => onChange({ eightType:null, bone:null, color:null, popularity:null });
+  const clearAll = () => onChange({ eightType:null, bone:null, color:null, popularity:null, search:"" });
   return (
     <div style={{position:"fixed", inset:0, zIndex:1000, display:"flex", alignItems:"flex-end", justifyContent:"center"}}>
       <div onClick={onClose} style={{position:"absolute", inset:0, background:"rgba(0,0,0,0.5)", backdropFilter:"blur(4px)"}}/>
@@ -386,7 +393,7 @@ const FilterPanel = ({ filter, onChange, onClose }) => {
             <h2 style={{margin:0,fontSize:20,fontWeight:900,
               background:"linear-gradient(135deg,#f9a8d4,#c084fc)",
               WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>🔍 絞り込み</h2>
-            <p style={{margin:"3px 0 0",fontSize:11,color:"rgba(255,255,255,0.4)"}}>AI診断の結果でフィルター</p>
+            <p style={{margin:"3px 0 0",fontSize:11,color:"rgba(255,255,255,0.4)"}}>AI診断・ユーザー名でフィルター</p>
           </div>
           {activeFilterCount(filter)>0 && (
             <button onClick={clearAll} style={{
@@ -395,6 +402,41 @@ const FilterPanel = ({ filter, onChange, onClose }) => {
               fontSize:11,fontWeight:700,cursor:"pointer"}}>クリア</button>
           )}
         </div>
+
+        {/* 🆕 Task D: ユーザーネーム検索 */}
+        <div style={{marginBottom:20}}>
+          <div style={{fontSize:12,fontWeight:800,color:"rgba(255,255,255,0.6)",marginBottom:10}}>👤 ユーザー名で検索</div>
+          <div style={{position:"relative"}}>
+            <span style={{position:"absolute", left:14, top:"50%", transform:"translateY(-50%)",
+              fontSize:14, color:"rgba(255,255,255,0.3)", pointerEvents:"none"}}>🔍</span>
+            <input
+              type="text"
+              placeholder="@ユーザー名を入力..."
+              value={filter.search || ""}
+              onChange={e => onChange({ ...filter, search: e.target.value })}
+              style={{
+                width:"100%", padding:"11px 38px 11px 38px", borderRadius:12,
+                border:"1.5px solid rgba(255,255,255,0.15)", fontSize:14, outline:"none",
+                background:"rgba(255,255,255,0.07)", backdropFilter:"blur(12px)",
+                color:"#fff", caretColor:"#f472b6", boxSizing:"border-box",
+              }}
+            />
+            {(filter.search || "").trim() && (
+              <button
+                onClick={() => onChange({ ...filter, search: "" })}
+                style={{
+                  position:"absolute", right:10, top:"50%", transform:"translateY(-50%)",
+                  width:22, height:22, borderRadius:"50%", border:"none", cursor:"pointer",
+                  background:"rgba(255,255,255,0.15)", color:"rgba(255,255,255,0.7)",
+                  fontSize:11, fontWeight:900,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                }}
+                aria-label="検索をクリア"
+              >×</button>
+            )}
+          </div>
+        </div>
+
         <div style={{marginBottom:20}}>
           <div style={{fontSize:12,fontWeight:800,color:"rgba(255,255,255,0.6)",marginBottom:10}}>💫 8タイプ分類</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -443,6 +485,14 @@ const FilterPanel = ({ filter, onChange, onClose }) => {
 
 const ActiveFilterRow = ({ filter, onClear }) => {
   const chips = [];
+  // 🆕 Task D: 検索チップ
+  if ((filter.search || "").trim()) {
+    chips.push({
+      key:"search",
+      label:"🔍 @"+filter.search.trim().replace(/^@/, ""),
+      grad:"linear-gradient(135deg,#60a5fa,#818cf8)",
+    });
+  }
   if (filter.eightType) {
     const t = EIGHT_TYPES.find(e=>e.label===filter.eightType);
     chips.push({ key:"eightType", label:"💫 "+filter.eightType, grad:t?.grad });
@@ -785,14 +835,19 @@ export default function HyokaApp() {
   const [aiLoading, setAiLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [toast, setToast] = useState(null);
-  const [feedFilter, setFeedFilter] = useState({ eightType:null, bone:null, color:null, popularity:null });
-  const [browseFilter, setBrowseFilter] = useState({ eightType:null, bone:null, color:null, popularity:null });
+  const [feedFilter, setFeedFilter] = useState({ eightType:null, bone:null, color:null, popularity:null, search:"" });
+  const [browseFilter, setBrowseFilter] = useState({ eightType:null, bone:null, color:null, popularity:null, search:"" });
   const [filterOpen, setFilterOpen] = useState(false);
   // 🆕 Task 6: 並び順の状態（フィードとブラウズで独立）
   const [feedSort, setFeedSort] = useState("newest");
   const [browseSort, setBrowseSort] = useState("newest");
   // シャッフルのシード値（「シャッフル」ボタンを押すたびに更新 → 新しい順になる）
   const [shuffleSeed, setShuffleSeed] = useState(() => Date.now() % 10000);
+  // 🆕 Task 7: 履歴画面の状態
+  //   myEvalTab: "all" | "liked" | "voted"（自分の評価履歴タブ切替）
+  //   aiHistoryTypeFilter: null | "キュート" | ...（AI診断履歴の8タイプフィルター）
+  const [myEvalTab, setMyEvalTab] = useState("all");
+  const [aiHistoryTypeFilter, setAiHistoryTypeFilter] = useState(null);
   const [aiOnlyHistory, setAiOnlyHistory] = useState([]);
   const [inviteUrl, setInviteUrl] = useState("");
   // 🆕 fileRef は labelパターンに変えたので不要になりました
@@ -1079,6 +1134,61 @@ export default function HyokaApp() {
     }
   };
 
+  // 🆕 Task 7: 自分の評価履歴から1件削除
+  //   myEvals から該当エントリを消す＆posts側のいいね・投票を巻き戻す
+  const handleDeleteEval = (postId) => {
+    const ev = myEvals.find(e => e.postId === postId);
+    if (!ev) return;
+    if (!window.confirm(`@${ev.postUsername} への評価を取り消しますか？`)) return;
+
+    // posts / myPost の数字を巻き戻す
+    setPosts(prev => prev.map(pp => {
+      if (pp.id !== postId) return pp;
+      let newLikes = pp.likes || 0;
+      let newVotes = { ...pp.votes };
+      if (ev.liked) newLikes = Math.max(0, newLikes - 1);
+      VOTE_AXES.forEach(axis => {
+        const choice = ev.votes?.[axis.id];
+        if (!choice) return;
+        const axisVotes = { ...(newVotes[axis.id] || {}) };
+        if (axisVotes[choice]) {
+          axisVotes[choice] = axisVotes[choice] - 1;
+          if (axisVotes[choice] <= 0) delete axisVotes[choice];
+        }
+        newVotes = { ...newVotes, [axis.id]: axisVotes };
+      });
+      return { ...pp, likes: newLikes, votes: newVotes };
+    }));
+    if (myPost?.id === postId) {
+      setMyPost(prev => {
+        if (!prev) return prev;
+        let newLikes = prev.likes || 0;
+        let newVotes = { ...prev.votes };
+        if (ev.liked) newLikes = Math.max(0, newLikes - 1);
+        VOTE_AXES.forEach(axis => {
+          const choice = ev.votes?.[axis.id];
+          if (!choice) return;
+          const axisVotes = { ...(newVotes[axis.id] || {}) };
+          if (axisVotes[choice]) {
+            axisVotes[choice] = axisVotes[choice] - 1;
+            if (axisVotes[choice] <= 0) delete axisVotes[choice];
+          }
+          newVotes = { ...newVotes, [axis.id]: axisVotes };
+        });
+        return { ...prev, likes: newLikes, votes: newVotes };
+      });
+    }
+    setMyEvals(prev => prev.filter(e => e.postId !== postId));
+    showToast("🗑 評価を取り消しました");
+  };
+
+  // 🆕 Task 7: AI診断履歴から1件だけ削除
+  const handleDeleteAiHistory = (id) => {
+    if (!window.confirm("この診断結果を削除しますか？")) return;
+    setAiOnlyHistory(prev => prev.filter(item => item.id !== id));
+    showToast("🗑 削除しました");
+  };
+
   const copyInviteLink = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
@@ -1161,7 +1271,7 @@ export default function HyokaApp() {
           </div>
           {activeFilterCount(feedFilter)>0 && (
             <ActiveFilterRow filter={feedFilter}
-              onClear={(key)=>setFeedFilter(f=>({...f, [key]:null}))}/>
+              onClear={(key)=>setFeedFilter(f=>({...f, [key]: key==="search" ? "" : null}))}/>
           )}
           {/* 🆕 Task 6: 並び順切替 */}
           <SortTabs current={feedSort} onChange={handleSortChange(setFeedSort)}/>
@@ -1454,7 +1564,7 @@ export default function HyokaApp() {
           </div>
           {activeFilterCount(browseFilter)>0 && (
             <ActiveFilterRow filter={browseFilter}
-              onClear={(key)=>setBrowseFilter(f=>({...f, [key]:null}))}/>
+              onClear={(key)=>setBrowseFilter(f=>({...f, [key]: key==="search" ? "" : null}))}/>
           )}
           {/* 🆕 Task 6: 並び順切替 */}
           <SortTabs current={browseSort} onChange={handleSortChange(setBrowseSort)}/>
@@ -1608,90 +1718,257 @@ export default function HyokaApp() {
       )}
 
       {/* MY EVAL — Task 7 で本実装予定、今は簡易表示 */}
-      {mode==="myeval" && (
-        <div style={{position:"relative",zIndex:1,padding:"36px 24px 60px",display:"flex",flexDirection:"column",gap:14}}>
-          <BackBtn onClick={()=>setMode("mypage")}/>
-          <h2 style={{margin:0,fontSize:24,fontWeight:900,
-            background:"linear-gradient(135deg,#94a3b8,#cbd5e1)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-            📝 自分の評価履歴
-          </h2>
-          <p style={{margin:0,fontSize:12,color:"rgba(255,255,255,0.28)"}}>
-            ※ あなたが送ったいいね・投票の記録
-          </p>
-          {myEvals.length===0 && (
-            <div style={{color:"rgba(255,255,255,0.2)",textAlign:"center",marginTop:60,fontSize:15}}>
-              まだ評価していません
+      {/* 🆕 Task 7: 自分の評価履歴 — サムネ・統計・タブ・削除付き */}
+      {mode==="myeval" && (() => {
+        // 新着順にソート（time 文字列では正確に並べにくいので、配列末尾ほど新しいという前提で逆順にする）
+        // 今の handleLike / handleVote は myEvals の末尾に push → 末尾が最新 → reverse で新着順
+        const sorted = [...myEvals].reverse();
+        // 投稿画像とのマッピング（posts から id で引っ張る）
+        const enriched = sorted.map(ev => ({
+          ...ev,
+          post: posts.find(p => p.id === ev.postId),
+          voteCount: VOTE_AXES.filter(ax => ev.votes?.[ax.id]).length,
+        }));
+        // タブによる絞り込み
+        const filtered = enriched.filter(ev => {
+          if (myEvalTab === "liked") return ev.liked;
+          if (myEvalTab === "voted") return ev.voteCount > 0;
+          return true; // all
+        });
+        // 統計
+        const stats = {
+          total: enriched.length,
+          likedTotal: enriched.filter(e => e.liked).length,
+          voteTotal: enriched.reduce((sum, e) => sum + e.voteCount, 0),
+        };
+
+        return (
+          <div style={{position:"relative",zIndex:1,padding:"36px 24px 60px",display:"flex",flexDirection:"column",gap:14}}>
+            <BackBtn onClick={()=>setMode("mypage")}/>
+            <div>
+              <h2 style={{margin:0,fontSize:24,fontWeight:900,
+                background:"linear-gradient(135deg,#6366f1,#818cf8)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+                📝 自分の評価履歴
+              </h2>
+              <p style={{margin:"4px 0 0",fontSize:11,color:"rgba(255,255,255,0.3)"}}>あなたが送ったいいね・投票の記録</p>
             </div>
-          )}
-          {myEvals.map((ev,i)=>(
-            <Glass key={i} style={{padding:"16px 18px"}}>
-              <div style={{fontWeight:700,color:"#fff",fontSize:15}}>@{ev.postUsername}</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
-                {ev.liked && (
-                  <span style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:800,color:"#fff",
-                    background:"linear-gradient(135deg,#f43f5e,#e879f9)"}}>❤️ いいね</span>
-                )}
-                {VOTE_AXES.map(axis => {
-                  const choice = ev.votes?.[axis.id];
-                  if (!choice) return null;
-                  const label = choice === UNKNOWN_VOTE ? "わからない" : choice;
+
+            {/* 統計カード */}
+            {stats.total > 0 && (
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
+                <div style={{textAlign:"center",padding:"10px 6px",borderRadius:12,
+                  background:"rgba(99,102,241,0.1)",border:"1px solid rgba(99,102,241,0.2)"}}>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>👥 評価した</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#818cf8",marginTop:2}}>{stats.total}<span style={{fontSize:11,fontWeight:700,opacity:0.6}}>人</span></div>
+                </div>
+                <div style={{textAlign:"center",padding:"10px 6px",borderRadius:12,
+                  background:"rgba(244,63,94,0.1)",border:"1px solid rgba(244,63,94,0.2)"}}>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>❤️ いいね</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#f472b6",marginTop:2}}>{stats.likedTotal}</div>
+                </div>
+                <div style={{textAlign:"center",padding:"10px 6px",borderRadius:12,
+                  background:"rgba(139,92,246,0.1)",border:"1px solid rgba(139,92,246,0.2)"}}>
+                  <div style={{fontSize:10,color:"rgba(255,255,255,0.5)"}}>💫 投票</div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#c084fc",marginTop:2}}>{stats.voteTotal}</div>
+                </div>
+              </div>
+            )}
+
+            {/* タブ切替 */}
+            {stats.total > 0 && (
+              <div style={{display:"flex",gap:4,padding:3,
+                background:"rgba(0,0,0,0.25)",borderRadius:14,border:"1px solid rgba(255,255,255,0.05)"}}>
+                {[
+                  { id:"all",   label:"すべて", grad:"linear-gradient(135deg,#6366f1,#818cf8)" },
+                  { id:"liked", label:"❤️ いいね", grad:"linear-gradient(135deg,#f43f5e,#e879f9)" },
+                  { id:"voted", label:"💫 投票", grad:"linear-gradient(135deg,#8b5cf6,#ec4899)" },
+                ].map(t => {
+                  const active = myEvalTab === t.id;
                   return (
-                    <span key={axis.id} style={{padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:800,color:"#fff",
-                      background: axis.grad}}>
-                      {axis.emoji} {label}
-                    </span>
+                    <button key={t.id} onClick={()=>setMyEvalTab(t.id)} style={{
+                      flex:1,padding:"7px 4px",borderRadius:11,border:"none",
+                      background:active?t.grad:"transparent",
+                      color:active?"#fff":"rgba(255,255,255,0.45)",
+                      fontSize:11,fontWeight:800,cursor:"pointer",transition:"all .15s",
+                      boxShadow:active?"0 2px 10px rgba(0,0,0,0.3)":"none"}}>
+                      {t.label}
+                    </button>
                   );
                 })}
               </div>
-              <div style={{fontSize:11,color:"rgba(255,255,255,0.22)",marginTop:8}}>{ev.time}</div>
-            </Glass>
-          ))}
-        </div>
-      )}
+            )}
+
+            {/* エントリ一覧 */}
+            {stats.total === 0 ? (
+              <div style={{color:"rgba(255,255,255,0.2)",textAlign:"center",marginTop:60,fontSize:15}}>
+                まだ評価していません
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{color:"rgba(255,255,255,0.25)",textAlign:"center",marginTop:40,fontSize:14}}>
+                このタブに該当する履歴はありません
+              </div>
+            ) : (
+              filtered.map((ev, i) => (
+                <Glass key={ev.postId} style={{padding:"14px 14px",overflow:"hidden"}}>
+                  <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                    {/* サムネ（タップで投稿詳細に行くことはTask 7範囲外、今はただの視覚補助） */}
+                    {ev.post?.image && (
+                      <img src={ev.post.image} alt=""
+                        style={{width:56,height:56,borderRadius:12,objectFit:"cover",flexShrink:0,
+                          border:"1px solid rgba(255,255,255,0.1)"}}/>
+                    )}
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:6}}>
+                        <div style={{fontWeight:700,color:"#fff",fontSize:14,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                          @{ev.postUsername}
+                        </div>
+                        {/* 削除ボタン */}
+                        <button onClick={()=>handleDeleteEval(ev.postId)}
+                          aria-label="この評価を削除"
+                          style={{
+                            width:24,height:24,borderRadius:"50%",border:"none",cursor:"pointer",
+                            background:"rgba(255,255,255,0.08)",color:"rgba(255,255,255,0.5)",
+                            fontSize:11,fontWeight:900,flexShrink:0,
+                            display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                      </div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:8}}>
+                        {ev.liked && (
+                          <span style={{padding:"2px 9px",borderRadius:20,fontSize:10,fontWeight:800,color:"#fff",
+                            background:"linear-gradient(135deg,#f43f5e,#e879f9)"}}>❤️ いいね</span>
+                        )}
+                        {VOTE_AXES.map(axis => {
+                          const choice = ev.votes?.[axis.id];
+                          if (!choice) return null;
+                          const label = choice === UNKNOWN_VOTE ? "わからない" : choice;
+                          return (
+                            <span key={axis.id} style={{padding:"2px 9px",borderRadius:20,fontSize:10,fontWeight:800,color:"#fff",
+                              background:axis.grad}}>
+                              {axis.emoji} {label}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {ev.time && <div style={{fontSize:10,color:"rgba(255,255,255,0.3)",marginTop:6}}>{ev.time}</div>}
+                    </div>
+                  </div>
+                </Glass>
+              ))
+            )}
+          </div>
+        );
+      })()}
 
       {/* AI HISTORY */}
-      {mode==="aiHistory" && (
-        <div style={{position:"relative",zIndex:1,padding:"36px 24px 60px",display:"flex",flexDirection:"column",gap:16}}>
-          <BackBtn onClick={()=>setMode("mypage")}/>
-          <div>
-            <h2 style={{margin:0,fontSize:24,fontWeight:900,
-              background:"linear-gradient(135deg,#8b5cf6,#ec4899)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-              🗂 AI診断の履歴
-            </h2>
-            <p style={{margin:"8px 0 0",fontSize:12,color:"rgba(255,255,255,0.35)"}}>🔒 自分だけの記録（非公開）</p>
-          </div>
-          {aiOnlyHistory.length===0 && (
-            <div style={{color:"rgba(255,255,255,0.2)",textAlign:"center",marginTop:60,fontSize:15}}>まだ診断していません</div>
-          )}
-          {aiOnlyHistory.map(item => (
-            <Glass key={item.id} style={{overflow:"hidden",padding:14}}>
-              <div style={{display:"flex",gap:12,marginBottom:12}}>
-                <img src={item.image} style={{width:70,height:70,borderRadius:14,objectFit:"cover",flexShrink:0}}/>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{item.time}</div>
-                  <div style={{fontSize:18,fontWeight:900,marginTop:3,
-                    background:"linear-gradient(135deg,#f9a8d4,#c084fc)",
-                    WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-                    💫 {item.analysis?.eightType?.primary}
-                  </div>
-                  {item.analysis?.charm && <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:3,lineHeight:1.5,fontStyle:"italic"}}>💭 {item.analysis.charm}</div>}
+      {/* 🆕 Task 7: AI診断履歴 — 件数・個別削除・タイプフィルター */}
+      {mode==="aiHistory" && (() => {
+        // タイプフィルター適用
+        const filtered = aiHistoryTypeFilter
+          ? aiOnlyHistory.filter(item => item.analysis?.eightType?.primary === aiHistoryTypeFilter)
+          : aiOnlyHistory;
+        // 履歴に登場する8タイプ一覧（実際に診断されたもののみ）
+        const appearingTypes = Array.from(new Set(
+          aiOnlyHistory.map(item => item.analysis?.eightType?.primary).filter(Boolean)
+        ));
+
+        return (
+          <div style={{position:"relative",zIndex:1,padding:"36px 24px 60px",display:"flex",flexDirection:"column",gap:16}}>
+            <BackBtn onClick={()=>setMode("mypage")}/>
+            <div>
+              <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+                <h2 style={{margin:0,fontSize:24,fontWeight:900,
+                  background:"linear-gradient(135deg,#8b5cf6,#ec4899)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+                  🗂 AI診断の履歴
+                </h2>
+                {aiOnlyHistory.length>0 && (
+                  <span style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.5)"}}>
+                    {aiOnlyHistory.length}件
+                  </span>
+                )}
+              </div>
+              <p style={{margin:"6px 0 0",fontSize:11,color:"rgba(255,255,255,0.35)"}}>🔒 自分だけの記録（非公開）</p>
+            </div>
+
+            {/* タイプフィルター（登場するタイプだけチップ表示） */}
+            {appearingTypes.length >= 2 && (
+              <div>
+                <div style={{fontSize:10,color:"rgba(255,255,255,0.4)",marginBottom:6,fontWeight:700}}>💫 タイプで絞り込み</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  <FilterChip label="すべて" active={aiHistoryTypeFilter===null}
+                    grad="linear-gradient(135deg,#6366f1,#818cf8)"
+                    onClick={()=>setAiHistoryTypeFilter(null)}/>
+                  {appearingTypes.map(typeName => {
+                    const t = EIGHT_TYPES.find(e=>e.label===typeName);
+                    return (
+                      <FilterChip key={typeName} label={typeName}
+                        active={aiHistoryTypeFilter===typeName}
+                        grad={t?.grad}
+                        onClick={()=>setAiHistoryTypeFilter(
+                          aiHistoryTypeFilter===typeName ? null : typeName
+                        )}/>
+                    );
+                  })}
                 </div>
               </div>
-              <AIAnalysisCard analysis={item.analysis} defaultOpen={false}/>
-            </Glass>
-          ))}
-          {aiOnlyHistory.length>0 && (
-            <button onClick={()=>{
-              if (window.confirm("すべての履歴を削除しますか？")) setAiOnlyHistory([]);
-            }} style={{
-              background:"none",border:"1px solid rgba(255,255,255,0.15)",
-              color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:600,
-              padding:"10px",borderRadius:12,cursor:"pointer",marginTop:8}}>
-              🗑 履歴をすべて削除
-            </button>
-          )}
-        </div>
-      )}
+            )}
+
+            {/* リスト */}
+            {aiOnlyHistory.length===0 ? (
+              <div style={{color:"rgba(255,255,255,0.2)",textAlign:"center",marginTop:60,fontSize:15}}>
+                まだ診断していません
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{color:"rgba(255,255,255,0.25)",textAlign:"center",marginTop:40,fontSize:14}}>
+                このタイプの履歴はありません
+              </div>
+            ) : (
+              filtered.map(item => (
+                <Glass key={item.id} style={{overflow:"hidden",padding:14,position:"relative"}}>
+                  {/* 個別削除ボタン（右上） */}
+                  <button onClick={()=>handleDeleteAiHistory(item.id)}
+                    aria-label="この履歴を削除"
+                    style={{
+                      position:"absolute",top:10,right:10,
+                      width:26,height:26,borderRadius:"50%",border:"none",cursor:"pointer",
+                      background:"rgba(0,0,0,0.35)",color:"rgba(255,255,255,0.7)",
+                      fontSize:12,fontWeight:900,zIndex:2,
+                      display:"flex",alignItems:"center",justifyContent:"center",
+                      backdropFilter:"blur(6px)",
+                    }}>×</button>
+
+                  <div style={{display:"flex",gap:12,marginBottom:12}}>
+                    <img src={item.image} alt="" style={{width:70,height:70,borderRadius:14,objectFit:"cover",flexShrink:0}}/>
+                    <div style={{flex:1,minWidth:0,paddingRight:28}}>
+                      <div style={{fontSize:10,color:"rgba(255,255,255,0.3)"}}>{item.time}</div>
+                      <div style={{fontSize:18,fontWeight:900,marginTop:3,
+                        background:"linear-gradient(135deg,#f9a8d4,#c084fc)",
+                        WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
+                        💫 {item.analysis?.eightType?.primary}
+                      </div>
+                      {item.analysis?.charm && <div style={{fontSize:11,color:"rgba(255,255,255,0.55)",marginTop:3,lineHeight:1.5,fontStyle:"italic"}}>💭 {item.analysis.charm}</div>}
+                    </div>
+                  </div>
+                  <AIAnalysisCard analysis={item.analysis} defaultOpen={false}/>
+                </Glass>
+              ))
+            )}
+
+            {/* 全削除ボタン */}
+            {aiOnlyHistory.length>0 && (
+              <button onClick={()=>{
+                if (window.confirm("すべての履歴を削除しますか？")) {
+                  setAiOnlyHistory([]);
+                  setAiHistoryTypeFilter(null);
+                }
+              }} style={{
+                background:"none",border:"1px solid rgba(255,255,255,0.15)",
+                color:"rgba(255,255,255,0.4)",fontSize:12,fontWeight:600,
+                padding:"10px",borderRadius:12,cursor:"pointer",marginTop:8}}>
+                🗑 履歴をすべて削除
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {isMainTab && (
         <BottomNav current={mode} onChange={(t)=>{
