@@ -1,4 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  FACE_TYPE_GUIDE,
+  BONE_TYPE_GUIDE,
+  PC16_GUIDE,
+  CONFLICT_RULES,
+  SPRING_2026_TREND_FIT,
+  HEIGHT_ADJUSTMENTS,
+  PC4_TO_PC16,
+  DEFAULT_PC4_REPRESENTATIVE,
+} from "./styleGuideData";
 
 // ═══════════════════════════════════════════════════════════════
 // タイプ定義
@@ -206,6 +216,81 @@ const SPRING_OUTFITS_2026 = {
     "ニットベスト × Tシャツ × カーゴパンツ",
     "ストライプシャツワンピ × ブーツ",
   ],
+};
+
+// 骨格別の夏コーデ例（基本パターン4つずつ）
+// ※ トレンド情報は省略。夏のリアルなトレンド資料が来たら、SPRING相当に拡張する
+const SUMMER_OUTFITS_BASIC = {
+  "ストレート": [
+    "シンプルな半袖カットソー × ストレートデニム × サンダル",
+    "リネンシャツ × タイトスカート × ローファー",
+    "ノースリーブブラウス × ストレートパンツ × バレエシューズ",
+    "Vネックワンピース × ミニバッグ × フラットサンダル",
+  ],
+  "ウェーブ": [
+    "フリル袖ブラウス × ハイウエストフレアスカート × サンダル",
+    "キャミソール × 透け感カーディガン × ミニスカート",
+    "ショート丈Tシャツ × プリーツスカート × パンプス",
+    "ボウタイブラウス × ハイウエストショートパンツ × ストラップサンダル",
+  ],
+  "ナチュラル": [
+    "リネンシャツ × ワイドパンツ × スニーカー",
+    "Tシャツワンピ × デニムジャケット × フラットサンダル",
+    "オーバーサイズTシャツ × ワイドデニム × スポーツサンダル",
+    "ノースリーブのリネンワンピ × バスケット型バッグ",
+  ],
+};
+
+// 骨格別の秋コーデ例（基本パターン4つずつ）
+const AUTUMN_OUTFITS_BASIC = {
+  "ストレート": [
+    "白シャツ × タイトスカート × ローファー",
+    "ハリのあるニット × ストレートデニム × ショートブーツ",
+    "トレンチコート × きれいめパンツ × ローファー",
+    "シンプルニット × Iラインスカート × パンプス",
+  ],
+  "ウェーブ": [
+    "ふんわりニット × プリーツスカート × ショートブーツ",
+    "ショート丈カーディガン × ハイウエストパンツ × パンプス",
+    "リブニット × フレアスカート × バレエシューズ",
+    "ボウタイブラウス × タイトスカート × パンプス",
+  ],
+  "ナチュラル": [
+    "オーバーサイズニット × ワイドパンツ × スニーカー",
+    "ロングカーディガン × デニム × ブーツ",
+    "チェックシャツ × ワイドデニム × ブーツ",
+    "ニットベスト × Tシャツ × カーゴパンツ × スニーカー",
+  ],
+};
+
+// 骨格別の冬コーデ例（基本パターン4つずつ）
+const WINTER_OUTFITS_BASIC = {
+  "ストレート": [
+    "チェスターコート × きれいめニット × ストレートパンツ",
+    "タートルネックニット × タイトスカート × ロングブーツ",
+    "テーラードジャケット × Vネックニット × ストレートデニム",
+    "シンプルなコート × タートル × きれいめパンツ × ローファー",
+  ],
+  "ウェーブ": [
+    "ショート丈ダウン × フレアスカート × ショートブーツ",
+    "ノーカラーコート × リブニット × ハイウエストパンツ",
+    "ふんわりニット × プリーツスカート × ブーツ",
+    "ファー付きコート × ボウタイブラウス × タイトスカート",
+  ],
+  "ナチュラル": [
+    "ロングダウン × ニット × ワイドデニム × スニーカー",
+    "ボアコート × オーバーサイズニット × ワイドパンツ",
+    "ロングコート × タートルネック × ブーツ",
+    "ニットワンピ × ロングカーディガン × ロングブーツ",
+  ],
+};
+
+// 季節 → コーデデータのマップ（季節判定で出し分けるための索引）
+const SEASONAL_OUTFITS = {
+  "春": SPRING_OUTFITS_2026,
+  "夏": SUMMER_OUTFITS_BASIC,
+  "秋": AUTUMN_OUTFITS_BASIC,
+  "冬": WINTER_OUTFITS_BASIC,
 };
 
 // 2026年春の旬トレンド（全骨格共通）
@@ -940,8 +1025,11 @@ export default function HyokaApp() {
             <>
               <AIAnalysisCard analysis={analysisResult}/>
 
-              {/* 🛍 商品提案セクション（診断結果の直後に表示） */}
-              <ProductRecommendationSection analysis={analysisResult}/>
+              {/* 🌟 384通り対応・統合スタイルアドバイス（5タブ：全体/形/色/春/ヘア） */}
+              <StyleAdviceHub analysis={analysisResult}/>
+
+              {/* 🛍 買い物ガイド（楽天検索リンク付きの購入提案） */}
+              <BuyGuideCard analysis={analysisResult}/>
 
               <div style={{padding:"14px",borderRadius:16,
                 background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
@@ -1180,26 +1268,20 @@ export default function HyokaApp() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 🛍 ProductRecommendationSection
-//   診断結果に基づいて、似合うアイテムを論理的に説明するセクション
-//   骨格 × カテゴリで「形」を提案、パーソナルカラーで「色」を提案
-//   各カテゴリに楽天検索リンクを添える（アフィリエイトIDなしで動作、
-//   後でID追加するだけで収益化できる）
+// 🛍 BuyGuideCard
+//   元の ProductRecommendationSection を「買い物特化」にスリム化したもの。
+//   「色ガイド」と「春トレンド」は新しい StyleAdviceHub（色タブ・春タブ）
+//   側に役割分担で移しているので、ここでは買う場所への動線に集中する。
 // ═══════════════════════════════════════════════════════════════
-function ProductRecommendationSection({ analysis }) {
+function BuyGuideCard({ analysis }) {
   const boneType = analysis?.bone?.primary;
   const pcType = analysis?.personalColor?.primary;
-
-  // 必要なデータが揃っていない場合は表示しない
   if (!boneType || !pcType) return null;
   const boneRecs = BONE_RECOMMENDATIONS[boneType];
-  const colorGuide = PC_COLOR_GUIDE[pcType];
-  if (!boneRecs || !colorGuide) return null;
+  if (!boneRecs) return null;
 
   const season = getCurrentSeason();
   const categories = ["トップス", "ボトムス", "アウター"];
-  const boneTypeData = BONE_TYPES.find(b => b.label === boneType);
-  const pcTypeData = PC_TYPES.find(p => p.label === pcType);
 
   return (
     <div style={{borderRadius:18, overflow:"hidden",
@@ -1213,44 +1295,16 @@ function ProductRecommendationSection({ analysis }) {
         <div style={{fontSize:14, fontWeight:900,
           background:"linear-gradient(135deg,#fbbf24,#f472b6)",
           WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
-          🛍 あなたに似合うアイテム
+          🛍 {season}に買うべきアイテム
         </div>
         <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
-          {season}の今、{boneType}×{pcType}のあなたに似合う服を、
+          {boneType}のあなたに似合う服を、
           <span style={{color:"#fbbf24", fontWeight:700}}>「なぜ似合うのか」</span>
-          という理由つきで紹介します✨
+          という理由つきで紹介します。リンクから楽天で探せます✨
         </div>
       </div>
 
       <div style={{padding:"16px"}}>
-
-        {/* あなたの体型・色の特徴 */}
-        <div style={{padding:"14px", borderRadius:14, marginBottom:16,
-          background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
-          <div style={{fontSize:11, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:10}}>
-            👤 あなたの体型・色の特徴
-          </div>
-
-          <div style={{display:"flex", gap:8, marginBottom:10, flexWrap:"wrap"}}>
-            <span style={{padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:800, color:"#fff",
-              background: boneTypeData?.grad || "linear-gradient(135deg,#34d399,#06b6d4)"}}>
-              🦴 {boneType}
-            </span>
-            <span style={{padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:800, color:"#fff",
-              background: pcTypeData?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)"}}>
-              🎨 {pcType}
-            </span>
-          </div>
-
-          <div style={{fontSize:12, color:"rgba(255,255,255,0.75)", lineHeight:1.7}}>
-            {boneTypeData?.feature}
-          </div>
-          <div style={{fontSize:12, color:"rgba(255,255,255,0.75)", lineHeight:1.7, marginTop:6}}>
-            {colorGuide.description}
-          </div>
-        </div>
-
-        {/* カテゴリごとの提案 */}
         {categories.map((category, idx) => {
           const rec = boneRecs[category];
           if (!rec) return null;
@@ -1259,7 +1313,6 @@ function ProductRecommendationSection({ analysis }) {
 
           return (
             <div key={category} style={{marginTop: idx === 0 ? 0 : 18}}>
-
               {/* カテゴリ見出し */}
               <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
                 <div style={{width:4, height:18, borderRadius:2,
@@ -1293,7 +1346,7 @@ function ProductRecommendationSection({ analysis }) {
                 </div>
               </div>
 
-              {/* 選ぶときのチェックリスト */}
+              {/* チェックリスト */}
               <div style={{padding:"12px 14px", borderRadius:12,
                 background:"rgba(139,92,246,0.06)",
                 border:"1px solid rgba(139,92,246,0.2)", marginBottom:8}}>
@@ -1311,7 +1364,7 @@ function ProductRecommendationSection({ analysis }) {
                 </div>
               </div>
 
-              {/* 楽天検索リンク（アフィリエイトIDは後付け） */}
+              {/* 楽天検索リンク */}
               <a href={searchUrl} target="_blank" rel="noopener noreferrer"
                 style={{textDecoration:"none", display:"block"}}>
                 <div style={{padding:"11px 14px", borderRadius:12,
@@ -1328,62 +1381,10 @@ function ProductRecommendationSection({ analysis }) {
           );
         })}
 
-        {/* カラーガイド（最後にまとめて） */}
-        <div style={{marginTop:18, padding:"14px", borderRadius:14,
-          background: pcTypeData?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)",
-          color:"#fff"}}>
-          <div style={{fontSize:11, fontWeight:800, opacity:0.9, marginBottom:8}}>
-            🎨 {pcType}のあなたに似合う色
-          </div>
-
-          <div style={{fontSize:12, lineHeight:1.7, marginBottom:10}}>
-            {colorGuide.tip}
-          </div>
-
-          <div style={{marginBottom:10}}>
-            <div style={{fontSize:10, opacity:0.85, marginBottom:5, fontWeight:700}}>✓ おすすめの色</div>
-            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
-              {colorGuide.recommend.map((c, i) => (
-                <span key={i} style={{padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700,
-                  background:"rgba(255,255,255,0.2)",
-                  border:"1px solid rgba(255,255,255,0.3)"}}>{c}</span>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div style={{fontSize:10, opacity:0.85, marginBottom:5, fontWeight:700}}>✗ 避けたい色</div>
-            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
-              {colorGuide.avoid.map((c, i) => (
-                <span key={i} style={{padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700,
-                  background:"rgba(0,0,0,0.2)",
-                  border:"1px solid rgba(255,255,255,0.2)"}}>{c}</span>
-              ))}
-            </div>
-          </div>
-
-          {/* 春の今っぽいコーデ例（10〜20代向け） */}
-          {colorGuide.coordExample && (
-            <div style={{marginTop:12, padding:"10px 12px", borderRadius:10,
-              background:"rgba(0,0,0,0.18)", border:"1px solid rgba(255,255,255,0.2)"}}>
-              <div style={{fontSize:10, opacity:0.85, marginBottom:5, fontWeight:700}}>👗 {season}の今っぽいコーデ例</div>
-              <div style={{fontSize:12, fontWeight:700, lineHeight:1.6}}>
-                {colorGuide.coordExample}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 🌸 2026年春の組み合わせセクション */}
-        {season === "春" && (
-          <SpringTrendSection boneType={boneType}/>
-        )}
-
-        {/* フッター注意書き */}
         <div style={{marginTop:14, padding:"10px 12px", borderRadius:10,
           background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
           <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6}}>
-            💡 アイテムの提案は骨格診断・パーソナルカラー理論に基づいた一般的な指針です。
+            💡 提案は骨格診断・パーソナルカラー理論に基づく一般的な指針です。
             最終的にはあなたが「着てみて気分が上がるもの」が一番です。
           </div>
         </div>
@@ -1393,104 +1394,652 @@ function ProductRecommendationSection({ analysis }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 🌸 SpringTrendSection
-//   2026年春のトレンドと、骨格別の具体的な春コーデ例を表示。
-//   既存の理論的提案を補強する位置づけ。
+// 🌟 StyleAdviceHub
+//   384通り（8タイプ × 3骨格 × 16PC）対応の統合スタイルアドバイス。
+//   5タブ：全体／形／色／春／ヘア
+//   styleGuideData.js から深いガイダンスを引いてきて表示する。
+//
+//   16PCはデフォルトで4PCの「典型サブタイプ」に固定し、
+//   色タブでユーザーが4つから選び直せるようにしてある。
 // ═══════════════════════════════════════════════════════════════
-function SpringTrendSection({ boneType }) {
-  const [tipsOpen, setTipsOpen] = useState(false);
-  const outfits = SPRING_OUTFITS_2026[boneType] || [];
-  const trends = SPRING_TRENDS_2026;
+function StyleAdviceHub({ analysis }) {
+  const faceType = analysis?.eightType?.primary;
+  const boneType = analysis?.bone?.primary;
+  const pc4 = analysis?.personalColor?.primary;
+
+  // 16PC：4PCから「典型」サブタイプを初期値に。色タブで変更可。
+  const [pc16, setPc16] = useState(() =>
+    pc4 ? DEFAULT_PC4_REPRESENTATIVE[pc4] : null
+  );
+  const [activeTab, setActiveTab] = useState("overall");
+  const [hubOpen, setHubOpen] = useState(true);
+
+  // 必要なデータが揃ってないと表示しない
+  if (!faceType || !boneType || !pc4) return null;
+  const faceData = FACE_TYPE_GUIDE[faceType];
+  const boneData = BONE_TYPE_GUIDE[boneType];
+  const pcData = pc16 ? PC16_GUIDE[pc16] : null;
+  if (!faceData || !boneData) return null;
+
+  const pc16Options = PC4_TO_PC16[pc4] || [];
+
+  // この組み合わせに当てはまる衝突パターン
+  const applicableConflicts = useMemo(() =>
+    CONFLICT_RULES.examples.filter(c =>
+      c.pattern.includes(faceType) ||
+      c.pattern.includes(boneType) ||
+      (pc16 && c.pattern.includes(pc16))
+    ), [faceType, boneType, pc16]
+  );
+
+  // この組み合わせに似合うトレンド／注意のトレンド
+  const goodTrends = useMemo(() =>
+    SPRING_2026_TREND_FIT.trendItems.filter(t =>
+      t.goodFor?.faceType?.includes(faceType) ||
+      t.goodFor?.boneType?.includes(boneType) ||
+      t.goodFor?.pc16?.includes(pc16)
+    ), [faceType, boneType, pc16]
+  );
+  const carefulTrends = useMemo(() =>
+    SPRING_2026_TREND_FIT.trendItems.filter(t =>
+      t.careful?.faceType?.includes(faceType) ||
+      t.careful?.boneType?.includes(boneType) ||
+      t.careful?.pc16?.includes(pc16)
+    ), [faceType, boneType, pc16]
+  );
+
+  const tabs = [
+    { id:"overall", icon:"💫", label:"全体", color:"#a855f7" },
+    { id:"shape",   icon:"🦴", label:"形",   color:"#34d399" },
+    { id:"color",   icon:"🎨", label:"色",   color:"#fb923c" },
+    { id:"spring",  icon:"🌸", label:"春",   color:"#f472b6" },
+    { id:"hair",    icon:"✂️", label:"ヘア", color:"#14b8a6" },
+  ];
 
   return (
-    <div style={{marginTop:18, borderRadius:16, overflow:"hidden",
-      background:"linear-gradient(145deg,rgba(244,114,182,0.1),rgba(192,132,252,0.08))",
-      border:"1px solid rgba(244,114,182,0.3)"}}>
+    <div style={{borderRadius:18, overflow:"hidden",
+      background:"linear-gradient(145deg,rgba(168,85,247,0.1),rgba(20,184,166,0.06))",
+      border:"1px solid rgba(168,85,247,0.25)"}}>
 
-      {/* ヘッダー */}
-      <div style={{padding:"12px 14px",
-        background:"linear-gradient(135deg,rgba(244,114,182,0.2),rgba(192,132,252,0.15))",
-        borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{fontSize:13, fontWeight:900,
-          background:"linear-gradient(135deg,#f472b6,#c084fc)",
-          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
-          🌸 2026年春の組み合わせ例
+      {/* ヘッダー（クリックで開閉） */}
+      <div onClick={()=>setHubOpen(o=>!o)}
+        style={{padding:"14px 16px", cursor:"pointer",
+          background:"linear-gradient(135deg,rgba(168,85,247,0.22),rgba(20,184,166,0.15))",
+          borderBottom: hubOpen ? "1px solid rgba(255,255,255,0.08)" : "none",
+          display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+        <div>
+          <div style={{fontSize:14, fontWeight:900,
+            background:"linear-gradient(135deg,#a855f7,#ec4899,#f59e0b)",
+            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
+            🌟 あなた専用スタイルガイド
+          </div>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:3, lineHeight:1.5}}>
+            {faceType} × {boneType} × {pc4}（{pc16 || "サブタイプ未選択"}）
+          </div>
         </div>
-        <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
-          {trends.description}
+        <div style={{fontSize:11, color:"rgba(255,255,255,0.5)", fontWeight:700, marginLeft:8}}>
+          {hubOpen ? "▲" : "▼"}
         </div>
       </div>
 
-      <div style={{padding:"14px 16px"}}>
+      {hubOpen && (
+        <>
+          {/* タブバー */}
+          <div style={{padding:"10px 12px 4px",
+            display:"flex", gap:4,
+            background:"rgba(0,0,0,0.18)",
+            overflowX:"auto"}}>
+            {tabs.map(t => {
+              const active = activeTab === t.id;
+              return (
+                <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{
+                  flex:"1 1 auto", minWidth:0,
+                  padding:"7px 4px", borderRadius:9, border:"none",
+                  background: active
+                    ? `linear-gradient(135deg,${t.color},rgba(168,85,247,0.8))`
+                    : "transparent",
+                  color: active ? "#fff" : "rgba(255,255,255,0.5)",
+                  fontSize:11, fontWeight:800, cursor:"pointer",
+                  whiteSpace:"nowrap", transition:"all .15s",
+                }}>
+                  {t.icon} {t.label}
+                </button>
+              );
+            })}
+          </div>
 
-        {/* 骨格別コーデ例 */}
-        {outfits.length > 0 && (
-          <div style={{marginBottom:18}}>
-            <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
-              <div style={{width:4, height:18, borderRadius:2,
-                background:"linear-gradient(180deg,#f472b6,#c084fc)"}}/>
-              <div style={{fontSize:12, fontWeight:900, color:"#fff"}}>
-                ☆ {boneType}の春コーデ4選
-              </div>
-            </div>
-            <div style={{display:"flex", flexDirection:"column", gap:6}}>
-              {outfits.map((outfit, i) => (
-                <div key={i} style={{padding:"10px 12px", borderRadius:10,
-                  background:"rgba(244,114,182,0.06)",
-                  border:"1px solid rgba(244,114,182,0.2)",
-                  fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
-                  <span style={{color:"#f472b6", fontWeight:800, marginRight:4}}>0{i+1}</span>
-                  {outfit}
+          {/* タブ中身 */}
+          <div style={{padding:"14px 16px"}}>
+            {activeTab === "overall" && (
+              <OverallTabContent
+                faceType={faceType} boneType={boneType} pc4={pc4} pc16={pc16}
+                faceData={faceData} conflicts={applicableConflicts}/>
+            )}
+            {activeTab === "shape" && (
+              <ShapeTabContent boneType={boneType} boneData={boneData}/>
+            )}
+            {activeTab === "color" && (
+              <ColorTabContent
+                pc4={pc4} pc16={pc16} pcData={pcData}
+                pc16Options={pc16Options} setPc16={setPc16}/>
+            )}
+            {activeTab === "spring" && (
+              <SpringTabContent
+                boneType={boneType} faceType={faceType} pc16={pc16}
+                goodTrends={goodTrends} carefulTrends={carefulTrends}/>
+            )}
+            {activeTab === "hair" && (
+              <HairTabContent faceType={faceType} faceData={faceData}/>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// 共通：チップ風ピル（ハブ内のリスト表示で使い回す）
+// ─────────────────────────────────────────────────────────────────
+const Pill = ({ children, color="rgba(255,255,255,0.18)", border="rgba(255,255,255,0.25)", text="#fff" }) => (
+  <span style={{padding:"4px 11px", borderRadius:20, fontSize:11, fontWeight:700,
+    background: color, border: `1px solid ${border}`, color: text}}>
+    {children}
+  </span>
+);
+
+const SectionHead = ({ icon, label, color="rgba(255,255,255,0.55)" }) => (
+  <div style={{fontSize:11, fontWeight:800, color, marginBottom:8, letterSpacing:"0.3px"}}>
+    {icon} {label}
+  </div>
+);
+
+// ─────────────────────────────────────────────────────────────────
+// タブ1: 💫 全体（系統・印象・組み合わせ衝突）
+// ─────────────────────────────────────────────────────────────────
+function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts }) {
+  const eightTypeData = EIGHT_TYPES.find(e => e.label === faceType);
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:14}}>
+      {/* メインバナー */}
+      <div style={{padding:"14px", borderRadius:14,
+        background: eightTypeData?.grad || "linear-gradient(135deg,#a855f7,#ec4899)",
+        color:"#fff"}}>
+        <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>あなたの3軸の組み合わせ</div>
+        <div style={{fontSize:18, fontWeight:900, marginTop:4, lineHeight:1.4}}>
+          💫 {faceType} × 🦴 {boneType} × 🎨 {pc16 || pc4}
+        </div>
+        <div style={{fontSize:11, opacity:0.9, marginTop:6, lineHeight:1.6}}>
+          {faceData.category}
+        </div>
+      </div>
+
+      {/* 印象ワード */}
+      <div>
+        <SectionHead icon="💭" label="あなたが与える印象"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {faceData.impressionWords.map((w, i) => (
+            <Pill key={i} color="rgba(168,85,247,0.18)" border="rgba(168,85,247,0.35)">
+              {w}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 似合うファッション系統 */}
+      <div>
+        <SectionHead icon="👗" label="似合うファッション系統"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {faceData.fashionGenres.map((g, i) => (
+            <Pill key={i} color="rgba(236,72,153,0.18)" border="rgba(236,72,153,0.35)">
+              {g}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 春の鉄板アイテム */}
+      <div>
+        <SectionHead icon="✨" label="春の鉄板アイテム"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {faceData.springItems.map((item, i) => (
+            <Pill key={i} color="rgba(34,197,94,0.15)" border="rgba(34,197,94,0.3)">
+              {item}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 避けたいスタイル */}
+      <div>
+        <SectionHead icon="⚠️" label="避けたいスタイル"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {faceData.avoidItems.map((item, i) => (
+            <Pill key={i} color="rgba(239,68,68,0.15)" border="rgba(239,68,68,0.3)" text="rgba(255,255,255,0.85)">
+              {item}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 衝突パターン（軸が合わないときの解決法） */}
+      {conflicts.length > 0 && (
+        <div style={{padding:"12px 14px", borderRadius:12,
+          background:"rgba(251,191,36,0.08)",
+          border:"1px solid rgba(251,191,36,0.25)"}}>
+          <div style={{fontSize:11, fontWeight:800, color:"#fbbf24", marginBottom:8}}>
+            🔄 軸が衝突しているとき
+          </div>
+          <div style={{fontSize:10, color:"rgba(255,255,255,0.55)", marginBottom:10, lineHeight:1.5}}>
+            {CONFLICT_RULES.basic}
+          </div>
+          <div style={{display:"flex", flexDirection:"column", gap:8}}>
+            {conflicts.slice(0, 3).map((c, i) => (
+              <div key={i} style={{padding:"10px 12px", borderRadius:10,
+                background:"rgba(0,0,0,0.2)", border:"1px solid rgba(255,255,255,0.06)"}}>
+                <div style={{fontSize:11, fontWeight:800, color:"#fbbf24", marginBottom:4}}>
+                  {c.pattern}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 旬のキーアイテム */}
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:11, fontWeight:800, color:"rgba(255,255,255,0.6)", marginBottom:8}}>
-            🎯 今年のキーアイテム
-          </div>
-          <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
-            {trends.keyItems.map((item, i) => (
-              <span key={i} style={{padding:"4px 11px", borderRadius:20, fontSize:11, fontWeight:700,
-                background:"linear-gradient(135deg,rgba(244,114,182,0.25),rgba(192,132,252,0.2))",
-                border:"1px solid rgba(244,114,182,0.35)",
-                color:"#fff"}}>{item}</span>
+                <div style={{fontSize:11, color:"rgba(255,255,255,0.8)", lineHeight:1.6}}>
+                  → {c.solution}
+                </div>
+              </div>
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* 旬のカラー & 柄 */}
-        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14}}>
-          <div style={{padding:"10px 12px", borderRadius:10,
-            background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
-            <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:6}}>
-              🎨 旬の色
+// ─────────────────────────────────────────────────────────────────
+// タブ2: 🦴 形（骨格別シルエット・素材・身長別tip）
+// ─────────────────────────────────────────────────────────────────
+function ShapeTabContent({ boneType, boneData }) {
+  const boneVisual = BONE_TYPES.find(b => b.label === boneType);
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:14}}>
+      {/* メインバナー */}
+      <div style={{padding:"14px", borderRadius:14,
+        background: boneVisual?.grad || "linear-gradient(135deg,#34d399,#06b6d4)",
+        color:"#fff"}}>
+        <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>あなたの骨格</div>
+        <div style={{fontSize:18, fontWeight:900, marginTop:4}}>🦴 {boneType}</div>
+        <div style={{fontSize:11, opacity:0.9, marginTop:6, lineHeight:1.6}}>
+          {boneData.feature}
+        </div>
+      </div>
+
+      {/* 似合う形 */}
+      <div>
+        <SectionHead icon="✓" label="似合う形・シルエット"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {boneData.silhouettes.map((s, i) => (
+            <Pill key={i} color="rgba(52,211,153,0.18)" border="rgba(52,211,153,0.35)">
+              {s}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 似合う素材 */}
+      <div>
+        <SectionHead icon="🧵" label="似合う素材"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {boneData.materials.map((m, i) => (
+            <Pill key={i} color="rgba(6,182,212,0.18)" border="rgba(6,182,212,0.35)">
+              {m}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 苦手な形 */}
+      <div>
+        <SectionHead icon="✗" label="苦手な形"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {boneData.avoid.map((a, i) => (
+            <Pill key={i} color="rgba(239,68,68,0.15)" border="rgba(239,68,68,0.3)" text="rgba(255,255,255,0.85)">
+              {a}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 春の鉄板コーデ */}
+      <div style={{padding:"12px 14px", borderRadius:12,
+        background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)"}}>
+        <SectionHead icon="🌸" label="春の鉄板コーデ" color="#34d399"/>
+        <div style={{display:"flex", flexDirection:"column", gap:5}}>
+          {boneData.springStaples.map((staple, i) => (
+            <div key={i} style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.6,
+              paddingLeft:10, position:"relative"}}>
+              <span style={{position:"absolute", left:0, color:"#34d399"}}>•</span>
+              {staple}
             </div>
-            <div style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
-              {trends.trendColors.join("・")}
+          ))}
+        </div>
+      </div>
+
+      {/* 身長別の調整 */}
+      <div style={{padding:"12px 14px", borderRadius:12,
+        background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+        <SectionHead icon="📏" label="身長別の調整"/>
+        <div style={{display:"flex", flexDirection:"column", gap:8}}>
+          {[
+            { key:"short",  label:"〜155cm",   tip: boneData.heightTips.short },
+            { key:"medium", label:"155〜165cm", tip: boneData.heightTips.medium },
+            { key:"tall",   label:"165cm〜",   tip: boneData.heightTips.tall },
+          ].map(h => (
+            <div key={h.key} style={{padding:"8px 10px", borderRadius:8,
+              background:"rgba(0,0,0,0.18)", border:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{fontSize:10, fontWeight:800, color:"#34d399", marginBottom:3}}>
+                {h.label}
+              </div>
+              <div style={{fontSize:11, color:"rgba(255,255,255,0.78)", lineHeight:1.6}}>
+                {h.tip}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 2026年春トレンドとの相性 */}
+      {boneData.spring2026Fit && (
+        <div style={{padding:"12px 14px", borderRadius:12,
+          background:"rgba(244,114,182,0.06)", border:"1px solid rgba(244,114,182,0.22)"}}>
+          <SectionHead icon="🌸" label="2026年春トレンドとの相性" color="#f472b6"/>
+          <div style={{marginBottom:8}}>
+            <div style={{fontSize:10, fontWeight:700, color:"#34d399", marginBottom:4}}>◎ 似合う</div>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+              {boneData.spring2026Fit.good.map((g, i) => (
+                <Pill key={i} color="rgba(52,211,153,0.18)" border="rgba(52,211,153,0.35)">{g}</Pill>
+              ))}
             </div>
           </div>
-          <div style={{padding:"10px 12px", borderRadius:10,
+          {boneData.spring2026Fit.careful?.length > 0 && (
+            <div>
+              <div style={{fontSize:10, fontWeight:700, color:"#fbbf24", marginBottom:4}}>△ 工夫が必要</div>
+              <div style={{display:"flex", flexDirection:"column", gap:4}}>
+                {boneData.spring2026Fit.careful.map((c, i) => (
+                  <div key={i} style={{fontSize:11, color:"rgba(255,255,255,0.78)", lineHeight:1.5}}>
+                    • {c}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// タブ3: 🎨 色（16PCサブタイプ選択 + パレット + トレンド色マッチ）
+// ─────────────────────────────────────────────────────────────────
+function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
+  const pc4Visual = PC_TYPES.find(p => p.label === pc4);
+
+  // 2026年春の流行色のうち、自分のPCに似合うものを抽出
+  const matchingTrendColors = pc16
+    ? Object.entries(SPRING_2026_TREND_FIT.trendColorMatch || {})
+        .filter(([color, pcs]) => pcs.includes(pc16))
+        .map(([color]) => color)
+    : [];
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:14}}>
+      {/* メインバナー */}
+      <div style={{padding:"14px", borderRadius:14,
+        background: pc4Visual?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)",
+        color:"#fff"}}>
+        <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>あなたのカラー</div>
+        <div style={{fontSize:18, fontWeight:900, marginTop:4}}>
+          🎨 {pc4}
+          {pc16 && <span style={{fontSize:13, fontWeight:700, opacity:0.85, marginLeft:8}}>
+            （{pc16}）
+          </span>}
+        </div>
+        {pcData?.undertone && (
+          <div style={{fontSize:11, opacity:0.85, marginTop:4}}>{pcData.undertone}</div>
+        )}
+      </div>
+
+      {/* 16PCサブタイプ選択 */}
+      <div style={{padding:"12px 14px", borderRadius:12,
+        background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+        <SectionHead icon="🎯" label="サブタイプを選び直す（16タイプ細分類）"/>
+        <div style={{fontSize:10, color:"rgba(255,255,255,0.5)", marginBottom:10, lineHeight:1.5}}>
+          {pc4}グループは4つに細分化されます。タップして自分に近いものを選べば、
+          より精密な色アドバイスが見られます。
+        </div>
+        <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:6}}>
+          {pc16Options.map(opt => {
+            const active = opt === pc16;
+            const data = PC16_GUIDE[opt];
+            return (
+              <button key={opt} onClick={()=>setPc16(opt)} style={{
+                padding:"9px 8px", borderRadius:10, border:"none", cursor:"pointer",
+                background: active
+                  ? (pc4Visual?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)")
+                  : "rgba(255,255,255,0.05)",
+                color: active ? "#fff" : "rgba(255,255,255,0.65)",
+                fontSize:11, fontWeight:800, textAlign:"left",
+                transition:"all .15s",
+              }}>
+                <div>{opt}</div>
+                <div style={{fontSize:9, opacity: active ? 0.85 : 0.5, marginTop:2, fontWeight:600}}>
+                  {data?.keyword?.split("・").slice(0,2).join("・") || ""}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 選んだサブタイプの詳細 */}
+      {pcData && (
+        <>
+          <div style={{padding:"12px 14px", borderRadius:12,
             background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
-            <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:6}}>
-              🌼 旬の柄
+            <div style={{fontSize:11, fontWeight:800, color:"rgba(255,255,255,0.7)", marginBottom:8}}>
+              💭 {pc16}のキーワード
             </div>
-            <div style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
-              {trends.patterns.join("・")}
+            <div style={{fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.7}}>
+              {pcData.keyword}
             </div>
+          </div>
+
+          <div>
+            <SectionHead icon="✓" label="似合うベストカラー" color="#34d399"/>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+              {pcData.bestColors.map((c, i) => (
+                <Pill key={i} color="rgba(52,211,153,0.18)" border="rgba(52,211,153,0.35)">{c}</Pill>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <SectionHead icon="✗" label="避けたい色" color="#f87171"/>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+              {pcData.avoidColors.map((c, i) => (
+                <Pill key={i} color="rgba(239,68,68,0.15)" border="rgba(239,68,68,0.3)" text="rgba(255,255,255,0.85)">{c}</Pill>
+              ))}
+            </div>
+          </div>
+
+          <div style={{padding:"12px 14px", borderRadius:12,
+            background:"rgba(168,85,247,0.06)", border:"1px solid rgba(168,85,247,0.22)"}}>
+            <SectionHead icon="🌸" label="春の使い方" color="#c084fc"/>
+            <div style={{fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.7, marginBottom:8}}>
+              {pcData.springUsage}
+            </div>
+            <div style={{padding:"8px 10px", borderRadius:8,
+              background:"rgba(0,0,0,0.2)", border:"1px solid rgba(255,255,255,0.08)"}}>
+              <div style={{fontSize:10, fontWeight:700, color:"#c084fc", marginBottom:3}}>👗 コーデ例</div>
+              <div style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.6, fontWeight:600}}>
+                {pcData.coordExample}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 2026春の流行色との相性 */}
+      {matchingTrendColors.length > 0 && (
+        <div style={{padding:"12px 14px", borderRadius:12,
+          background:"rgba(244,114,182,0.08)", border:"1px solid rgba(244,114,182,0.25)"}}>
+          <SectionHead icon="🎯" label="2026年春の流行色との相性" color="#f472b6"/>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.65)", marginBottom:8, lineHeight:1.5}}>
+            今年の春のトレンドカラーのうち、{pc16}のあなたに特に似合う色：
+          </div>
+          <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+            {matchingTrendColors.map((c, i) => (
+              <Pill key={i} color="rgba(244,114,182,0.22)" border="rgba(244,114,182,0.4)">
+                {c}
+              </Pill>
+            ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
 
-        {/* スタイリングのヒント */}
+// ─────────────────────────────────────────────────────────────────
+// タブ4: 🌸 春（季節別コーデ・トレンド適合・4軸調整）
+// ─────────────────────────────────────────────────────────────────
+function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends }) {
+  const [tipsOpen, setTipsOpen] = useState(false);
+  const season = getCurrentSeason();
+  const outfits = (SEASONAL_OUTFITS[season] || {})[boneType] || [];
+  const isSpring = season === "春";
+  const trends = SPRING_TRENDS_2026;
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:14}}>
+      {/* メインバナー */}
+      <div style={{padding:"14px", borderRadius:14,
+        background:"linear-gradient(135deg,#f472b6,#c084fc)", color:"#fff"}}>
+        <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>
+          {isSpring ? "2026年春のあなた向けガイド" : `${season}のあなた向けガイド`}
+        </div>
+        <div style={{fontSize:16, fontWeight:900, marginTop:4}}>
+          🌸 {boneType} × {faceType}
+        </div>
+        <div style={{fontSize:11, opacity:0.9, marginTop:6, lineHeight:1.6}}>
+          {isSpring
+            ? trends.description
+            : `${boneType}・${faceType}のあなたに似合う${season}コーデを紹介。`}
+        </div>
+      </div>
+
+      {/* 骨格別コーデ例 */}
+      {outfits.length > 0 && (
+        <div>
+          <SectionHead icon="☆" label={`${boneType}の${season}コーデ4選`} color="#f472b6"/>
+          <div style={{display:"flex", flexDirection:"column", gap:6}}>
+            {outfits.map((o, i) => (
+              <div key={i} style={{padding:"10px 12px", borderRadius:10,
+                background:"rgba(244,114,182,0.06)",
+                border:"1px solid rgba(244,114,182,0.2)",
+                fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
+                <span style={{color:"#f472b6", fontWeight:800, marginRight:5}}>0{i+1}</span>
+                {o}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 春トレンド情報（春のみ） */}
+      {isSpring && (
+        <>
+          <div>
+            <SectionHead icon="🎯" label="今年のキーアイテム"/>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+              {trends.keyItems.map((item, i) => (
+                <Pill key={i} color="linear-gradient(135deg,rgba(244,114,182,0.25),rgba(192,132,252,0.2))"
+                  border="rgba(244,114,182,0.35)">
+                  {item}
+                </Pill>
+              ))}
+            </div>
+          </div>
+
+          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+            <div style={{padding:"10px 12px", borderRadius:10,
+              background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+              <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:5}}>
+                🎨 旬の色
+              </div>
+              <div style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
+                {trends.trendColors.join("・")}
+              </div>
+            </div>
+            <div style={{padding:"10px 12px", borderRadius:10,
+              background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+              <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:5}}>
+                🌼 旬の柄
+              </div>
+              <div style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
+                {trends.patterns.join("・")}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* あなたに似合うトレンド */}
+      {goodTrends.length > 0 && (
+        <div style={{padding:"12px 14px", borderRadius:12,
+          background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)"}}>
+          <SectionHead icon="◎" label="あなたに似合う2026春トレンド" color="#34d399"/>
+          <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+            {goodTrends.map((t, i) => (
+              <Pill key={i} color="rgba(52,211,153,0.22)" border="rgba(52,211,153,0.4)">
+                {t.name}
+              </Pill>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 注意のトレンド + 調整法 */}
+      {carefulTrends.length > 0 && (
+        <div style={{padding:"12px 14px", borderRadius:12,
+          background:"rgba(251,191,36,0.06)", border:"1px solid rgba(251,191,36,0.22)"}}>
+          <SectionHead icon="△" label="取り入れに工夫が必要なトレンド" color="#fbbf24"/>
+          <div style={{display:"flex", flexDirection:"column", gap:8}}>
+            {carefulTrends.map((t, i) => {
+              const adjustForUser = t.adjustments?.[boneType] || t.adjustments?.[faceType];
+              return (
+                <div key={i} style={{padding:"8px 10px", borderRadius:8,
+                  background:"rgba(0,0,0,0.18)", border:"1px solid rgba(255,255,255,0.06)"}}>
+                  <div style={{fontSize:11, fontWeight:800, color:"#fbbf24", marginBottom:3}}>
+                    {t.name}
+                  </div>
+                  {adjustForUser && (
+                    <div style={{fontSize:11, color:"rgba(255,255,255,0.78)", lineHeight:1.6}}>
+                      → {adjustForUser}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 雰囲気別の組み方（春のみ） */}
+      {isSpring && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(192,132,252,0.08)",
-          border:"1px solid rgba(192,132,252,0.25)", marginBottom:14}}>
-          <div style={{fontSize:11, fontWeight:800, color:"#c084fc", marginBottom:8}}>
-            ✨ 雰囲気別の組み方
-          </div>
+          border:"1px solid rgba(192,132,252,0.25)"}}>
+          <SectionHead icon="✨" label="雰囲気別の組み方" color="#c084fc"/>
           <div style={{display:"flex", flexDirection:"column", gap:5}}>
             {trends.styling.map((s, i) => (
               <div key={i} style={{fontSize:11, color:"rgba(255,255,255,0.8)", lineHeight:1.6}}>
@@ -1499,41 +2048,141 @@ function SpringTrendSection({ boneType }) {
             ))}
           </div>
         </div>
+      )}
 
-        {/* 4軸調整のコツ（折りたたみ） */}
-        <div style={{borderRadius:12, overflow:"hidden",
-          background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
-          <button onClick={()=>setTipsOpen(o=>!o)} style={{
-            width:"100%", padding:"11px 14px", border:"none", cursor:"pointer",
-            background:"transparent", display:"flex", alignItems:"center", justifyContent:"space-between",
-            color:"rgba(255,255,255,0.85)", fontSize:12, fontWeight:800}}>
-            <span>💡 似合わない服を着たいときのコツ（4軸調整）</span>
-            <span style={{fontSize:11, color:"rgba(255,255,255,0.5)"}}>{tipsOpen?"▲":"▼"}</span>
-          </button>
-          {tipsOpen && (
-            <div style={{padding:"4px 14px 14px"}}>
-              <div style={{fontSize:11, color:"rgba(255,255,255,0.6)", lineHeight:1.6, marginBottom:10}}>
-                骨格に合わない服でも、下の4つを調整するとかなり着られるようになります。
-              </div>
-              <div style={{display:"flex", flexDirection:"column", gap:8}}>
-                {FOUR_AXIS_TIPS.map((t, i) => (
-                  <div key={i} style={{display:"flex", gap:10, alignItems:"flex-start",
-                    padding:"10px 12px", borderRadius:10,
-                    background:"rgba(255,255,255,0.04)"}}>
-                    <div style={{fontSize:18, flexShrink:0}}>{t.icon}</div>
-                    <div style={{flex:1, minWidth:0}}>
-                      <div style={{fontSize:12, fontWeight:800, color:"#f472b6", marginBottom:3}}>
-                        {t.axis}
-                      </div>
-                      <div style={{fontSize:11, color:"rgba(255,255,255,0.8)", lineHeight:1.6}}>
-                        {t.tip}
-                      </div>
+      {/* 4軸調整のコツ（折りたたみ） */}
+      <div style={{borderRadius:12, overflow:"hidden",
+        background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+        <button onClick={()=>setTipsOpen(o=>!o)} style={{
+          width:"100%", padding:"11px 14px", border:"none", cursor:"pointer",
+          background:"transparent", display:"flex", alignItems:"center", justifyContent:"space-between",
+          color:"rgba(255,255,255,0.85)", fontSize:12, fontWeight:800}}>
+          <span>💡 似合わない服を着たいときのコツ（4軸調整）</span>
+          <span style={{fontSize:11, color:"rgba(255,255,255,0.5)"}}>{tipsOpen ? "▲" : "▼"}</span>
+        </button>
+        {tipsOpen && (
+          <div style={{padding:"4px 14px 14px"}}>
+            <div style={{fontSize:11, color:"rgba(255,255,255,0.6)", lineHeight:1.6, marginBottom:10}}>
+              骨格に合わない服でも、下の4つを調整するとかなり着られるようになります。
+            </div>
+            <div style={{display:"flex", flexDirection:"column", gap:8}}>
+              {FOUR_AXIS_TIPS.map((t, i) => (
+                <div key={i} style={{display:"flex", gap:10, alignItems:"flex-start",
+                  padding:"10px 12px", borderRadius:10,
+                  background:"rgba(255,255,255,0.04)"}}>
+                  <div style={{fontSize:18, flexShrink:0}}>{t.icon}</div>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:12, fontWeight:800, color:"#f472b6", marginBottom:3}}>
+                      {t.axis}
+                    </div>
+                    <div style={{fontSize:11, color:"rgba(255,255,255,0.8)", lineHeight:1.6}}>
+                      {t.tip}
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// タブ5: ✂️ ヘア（顔タイプ別の髪型推奨）
+// ─────────────────────────────────────────────────────────────────
+function HairTabContent({ faceType, faceData }) {
+  const hair = faceData.hair;
+
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:14}}>
+      {/* メインバナー */}
+      <div style={{padding:"14px", borderRadius:14,
+        background:"linear-gradient(135deg,#14b8a6,#06b6d4)", color:"#fff"}}>
+        <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>
+          {faceType}に似合う髪型
+        </div>
+        <div style={{fontSize:16, fontWeight:900, marginTop:4}}>
+          ✂️ {faceType}向けヘアガイド
+        </div>
+        <div style={{fontSize:11, opacity:0.9, marginTop:6, lineHeight:1.6}}>
+          {faceData.category}
+        </div>
+      </div>
+
+      {/* おすすめスタイル */}
+      <div>
+        <SectionHead icon="💇" label="おすすめのスタイル" color="#14b8a6"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {hair.recommend.map((s, i) => (
+            <Pill key={i} color="rgba(20,184,166,0.18)" border="rgba(20,184,166,0.4)">{s}</Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 前髪 */}
+      <div>
+        <SectionHead icon="✨" label="似合う前髪"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {hair.bangs.map((b, i) => (
+            <Pill key={i} color="rgba(6,182,212,0.18)" border="rgba(6,182,212,0.35)">{b}</Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 巻き */}
+      <div style={{padding:"10px 12px", borderRadius:10,
+        background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:4}}>
+          🌀 巻き・スタイリング
+        </div>
+        <div style={{fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.6}}>
+          {hair.curl}
+        </div>
+      </div>
+
+      {/* カラー */}
+      <div>
+        <SectionHead icon="🎨" label="似合うヘアカラー"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {hair.color.map((c, i) => (
+            <Pill key={i} color="rgba(168,85,247,0.18)" border="rgba(168,85,247,0.35)">{c}</Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 避けたい */}
+      <div>
+        <SectionHead icon="✗" label="避けたい髪型" color="#f87171"/>
+        <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+          {hair.avoid.map((a, i) => (
+            <Pill key={i} color="rgba(239,68,68,0.15)" border="rgba(239,68,68,0.3)" text="rgba(255,255,255,0.85)">
+              {a}
+            </Pill>
+          ))}
+        </div>
+      </div>
+
+      {/* 2026年春の旬ヘアトレンド（全タイプ共通） */}
+      <div style={{padding:"12px 14px", borderRadius:12,
+        background:"rgba(244,114,182,0.08)", border:"1px solid rgba(244,114,182,0.25)"}}>
+        <SectionHead icon="🌸" label="2026年春の旬ヘアトレンド" color="#f472b6"/>
+        <div style={{fontSize:11, color:"rgba(255,255,255,0.7)", lineHeight:1.6, marginBottom:8}}>
+          今年のキーワードは
+          <span style={{color:"#f472b6", fontWeight:700}}>「自然な動き」「軽やかなレイヤー」</span>。
+          韓国風・Y2Kの影響で、顔まわりにレイヤーを入れて抜け感を出すのがポイントです。
+        </div>
+        <div style={{display:"flex", flexDirection:"column", gap:6}}>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.78)", lineHeight:1.5}}>
+            • 人気カット：レイヤーカット（バタフライ・ハイレイヤー）／グラデーションボブ／タッセルボブ
+          </div>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.78)", lineHeight:1.5}}>
+            • 前髪：カーテンバング・シースルーバング＋マイクロウェーブ
+          </div>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.78)", lineHeight:1.5}}>
+            • カラー：透け感ブラウン・ベージュ・ピンクニュアンス
+          </div>
         </div>
       </div>
     </div>
