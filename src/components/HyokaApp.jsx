@@ -1135,6 +1135,12 @@ export default function HyokaApp() {
                     </div>
                   </div>
                   <AIAnalysisCard analysis={item.analysis} defaultOpen={false}/>
+
+                  {/* 履歴画面でも統合スタイルガイド＋買い物ガイドを表示 */}
+                  <div style={{marginTop:12, display:"flex", flexDirection:"column", gap:12}}>
+                    <StyleAdviceHub analysis={item.analysis}/>
+                    <BuyGuideCard analysis={item.analysis}/>
+                  </div>
                 </Glass>
               ))
             )}
@@ -1628,11 +1634,42 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(251,191,36,0.08)",
           border:"1px solid rgba(251,191,36,0.25)"}}>
-          <div style={{fontSize:11, fontWeight:800, color:"#fbbf24", marginBottom:8}}>
-            🔄 軸が衝突しているとき
+          <div style={{fontSize:12, fontWeight:800, color:"#fbbf24", marginBottom:8}}>
+            🤔 組み合わせで迷ったら
           </div>
-          <div style={{fontSize:10, color:"rgba(255,255,255,0.55)", marginBottom:10, lineHeight:1.5}}>
-            {CONFLICT_RULES.basic}
+
+          {/* 何が起きてるかの説明（やさしい言葉で） */}
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.75)", marginBottom:10, lineHeight:1.7}}>
+            顔タイプ・骨格・PCはそれぞれ別の軸を見ているので、組み合わせによっては
+            <span style={{color:"#fbbf24", fontWeight:700}}>「どっちに合わせればいいの？」</span>
+            と迷うことがあります。
+          </div>
+
+          {/* 基本ルール（迷ったときの判断基準） */}
+          <div style={{padding:"10px 12px", borderRadius:10,
+            background:"rgba(0,0,0,0.22)", marginBottom:10,
+            border:"1px solid rgba(251,191,36,0.18)"}}>
+            <div style={{fontSize:10, fontWeight:800, color:"#fbbf24", marginBottom:6, letterSpacing:"0.3px"}}>
+              📌 迷ったときの基本ルール
+            </div>
+            <div style={{fontSize:11, color:"rgba(255,255,255,0.85)", lineHeight:1.8}}>
+              <div>・顔まわり（トップス・襟・アクセ・ヘア）</div>
+              <div style={{paddingLeft:14, color:"rgba(255,255,255,0.7)"}}>
+                → <span style={{color:"#fbbf24", fontWeight:700}}>顔タイプとPC</span>に合わせる
+              </div>
+              <div style={{marginTop:4}}>・体のシルエット（ボトム・全体の形）</div>
+              <div style={{paddingLeft:14, color:"rgba(255,255,255,0.7)"}}>
+                → <span style={{color:"#fbbf24", fontWeight:700}}>骨格</span>に合わせる
+              </div>
+              <div style={{marginTop:4}}>
+                ・全部欲張らず、<span style={{color:"#fbbf24", fontWeight:700}}>主役は1つだけ</span>に絞る
+              </div>
+            </div>
+          </div>
+
+          {/* あなたの組み合わせの場合の具体例 */}
+          <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.6)", marginBottom:6, letterSpacing:"0.3px"}}>
+            ✨ あなたの組み合わせの場合
           </div>
           <div style={{display:"flex", flexDirection:"column", gap:8}}>
             {conflicts.slice(0, 3).map((c, i) => (
