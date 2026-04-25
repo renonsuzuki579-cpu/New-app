@@ -20,8 +20,8 @@ import React from "react";
 
 // ───────── 設定（あとで書き換えるところ） ─────────
 export const CATALOG_CONFIG = {
-  // 楽天アフィリエイトID（取得後にここを書き換える）
-  rakutenAffiliateId: "",
+  // 楽天アフィリエイトID
+  rakutenAffiliateId: "532f53ca.02addeb3.532f53cb.ef93f387",
   // Amazonアソシエイトタグ（取得後にここを書き換える）
   amazonAssociateTag: "",
 };
