@@ -39,6 +39,145 @@ const PC_TYPES = [
 ];
 
 // ═══════════════════════════════════════════════════════════════
+// 🛍 商品提案データ
+// ═══════════════════════════════════════════════════════════════
+// 思想：
+//   メインは「なぜ似合うのか」の論理的説明。
+//   商品リンクはあくまで参考（ユーザーが理解した上で見に行ける場所）。
+//
+// 構造：
+//   骨格3タイプ × カテゴリ3つ = 9パターンの「形」の提案
+//   パーソナルカラー4タイプ      = 4パターンの「色」のガイド
+//   この2つを組み合わせて、一人ひとりに合った提案を動的に作る。
+//
+// なぜこの分け方？
+//   服選びで一番大事なのは「形（骨格）」と「色（パーソナルカラー）」。
+//   8タイプ（フェミニン/クールなど）は印象づくりの軸であって、
+//   実際の購入判断には骨格と色の方が直接影響する。
+// ═══════════════════════════════════════════════════════════════
+
+// 骨格 × カテゴリ別の「形」の提案
+const BONE_RECOMMENDATIONS = {
+  "ストレート": {
+    "トップス": {
+      itemName: "白のきれいめシャツ or Vネックニット",
+      whyFits: "ストレートさんは上半身にハリがあって、シンプルな服ほどスタイルがよく見えるタイプ。Vネックや襟つきシャツで首元をスッキリ抜くと、それだけで一気に垢抜けます。",
+      avoid: "フリル・リボン・パフ袖など甘めの装飾。盛りすぎると上半身が重くなって、せっかくのきれいめさが消えちゃいます。",
+      checklist: ["素材: ハリのあるコットン、しっかりしたニット", "形: Vネック、襟つきシャツ、ジャストサイズ", "甘めを入れるなら: トップスか小物の1か所だけに", "避けたい: フリル多め、薄すぎる素材"],
+      searchKeyword: "Vネックニット レディース",
+    },
+    "ボトムス": {
+      itemName: "ストレートデニム or タイトスカート",
+      whyFits: "ストレートさんは縦のラインを強調するボトムスが得意。ストレートデニムやIラインのスカートで脚をまっすぐ見せると、全体が縦長にすっきり整います。",
+      avoid: "ふわっと広がるフレアスカート、プリーツ多め、ティアード。下半身にボリュームが出てバランスが崩れます。",
+      checklist: ["素材: ハリのあるデニム、しっかりした生地", "形: ストレート、テーパード、Iラインスカート", "丈: フルレングス〜くるぶし", "避けたい: ふんわりフレア、ローライズ"],
+      searchKeyword: "ストレートデニム レディース",
+    },
+    "アウター": {
+      itemName: "テーラードジャケット or デニムジャケット",
+      whyFits: "ストレートさんはきっちりした形が得意。テーラードジャケットでかっこよくキメるか、ジャストサイズのデニムジャケットでカジュアルに振るかで雰囲気を変えられます。",
+      avoid: "ボアコート、もこもこダウン、フリル装飾の多いアウター。上半身がさらに大きく見えてしまいます。",
+      checklist: ["素材: しっかりしたコットン、ウール、デニム", "形: テーラード、ジャストサイズのGジャン", "丈: ヒップ程度〜ショート丈", "避けたい: ボリューム素材、フリル多め"],
+      searchKeyword: "テーラードジャケット レディース 春",
+    },
+  },
+  "ウェーブ": {
+    "トップス": {
+      itemName: "ボウタイブラウス or ショート丈カーディガン",
+      whyFits: "ウェーブさんは華奢で柔らかい上半身が魅力。ボウタイブラウスやリブニットのショート丈で重心を上げると、可愛さもスタイルアップも両方叶います。今春は特にボウタイ系が来てます。",
+      avoid: "厚手のごつい素材、長すぎるトップス、ローウエスト。重心が下がってウェーブのバランスが崩れます。",
+      checklist: ["素材: シフォン、薄手のリブ、とろみ素材", "形: ショート丈、ウエスト位置を高く、ボウタイ・パフ袖", "首元: リボン、フリル、丸みのある襟", "避けたい: 厚手の重い生地、長すぎる丈"],
+      searchKeyword: "ボウタイブラウス レディース",
+    },
+    "ボトムス": {
+      itemName: "ハイウエストのフレアスカート or マーメイドスカート",
+      whyFits: "ウェーブさんはハイウエストで脚を長く見せるのが鉄則。フレアやマーメイドの揺れる軽やかなシルエットなら、女の子らしさがそのまま強みになります。",
+      avoid: "ローライズデニム、ハードなストレートパンツ。ウエスト位置が下がるとスタイルが崩れて見えます。",
+      checklist: ["素材: 軽くて柔らかい、揺れる生地", "形: フレア、マーメイド、プリーツ", "ウエスト: ハイウエスト必須", "避けたい: ローライズ、硬めのデニム"],
+      searchKeyword: "ハイウエスト フレアスカート",
+    },
+    "アウター": {
+      itemName: "ショート丈のデニムジャケット or カーディガン",
+      whyFits: "ウェーブさんはとにかく「ショート丈」と相性が良いです。デニムジャケットやカーディガンを腰より上の丈で羽織ると、重心が上がって脚が長く見えます。",
+      avoid: "ロングコート、ロングカーディガン、ボリュームたっぷりのダウン。下重心がさらに強調されてしまいます。",
+      checklist: ["素材: 柔らかいニット、軽いデニム", "形: ノーカラー、丸みのあるライン、ショート丈", "丈: ウエスト〜ヒップ手前", "避けたい: ロング丈、重い素材"],
+      searchKeyword: "ショート丈 デニムジャケット レディース",
+    },
+  },
+  "ナチュラル": {
+    "トップス": {
+      itemName: "オーバーサイズシャツ or ニットベスト",
+      whyFits: "ナチュラルさんはラフでこなれ感のある服が得意。オーバーサイズシャツでゆるっと羽織ったり、ニットベストでレイヤードすると、骨格感が一気にスタイルの良さに変わります。",
+      avoid: "ピチピチのカットソー、繊細すぎる甘いブラウス。骨っぽさが目立って服に着られている印象になります。",
+      checklist: ["素材: コットン、リネン、デニム、ざっくりニット", "形: オーバーサイズ、ドロップショルダー、ベスト重ね", "雰囲気: 抜け感、こなれ、レイヤード", "避けたい: ピチピチ、繊細レース、上品すぎる素材"],
+      searchKeyword: "オーバーサイズシャツ レディース",
+    },
+    "ボトムス": {
+      itemName: "ワイドデニム or カーゴパンツ",
+      whyFits: "ナチュラルさんは長めの手足とフレーム感を活かせる、ゆったり系ボトムスが鉄板。ワイドデニムやカーゴはこなれ感が出て、今っぽい韓国系コーデにも振れます。",
+      avoid: "スキニーデニム、ピタッとしたミニタイトスカート。骨や関節が強調されて本来の良さが消えてしまいます。",
+      checklist: ["素材: しっかりしたデニム、コットン、リネン", "形: ワイド、ストレート、カーゴ", "丈: フルレングス、マキシ、足首見せ", "避けたい: スキニー、ミニタイト"],
+      searchKeyword: "ワイドデニム レディース",
+    },
+    "アウター": {
+      itemName: "デニムジャケット（ロング） or ロングカーディガン",
+      whyFits: "ナチュラルさんは「縦の長さ」が武器。ロングのデニムジャケットやざっくりロングカーデを羽織るだけで、スタイル良く見えてこなれた雰囲気が出ます。",
+      avoid: "ジャストサイズのテーラードジャケット、きっちりしすぎたコート。ナチュラルのラフさと合わず堅苦しく見えます。",
+      checklist: ["素材: デニム、ざっくりニット、リネン", "形: ロング、ゆるめのライン", "丈: ヒップ下〜膝下", "避けたい: ジャストサイズのテーラード"],
+      searchKeyword: "ロング デニムジャケット レディース",
+    },
+  },
+};
+
+// パーソナルカラー別の「色」のガイド
+const PC_COLOR_GUIDE = {
+  "スプリング": {
+    description: "明るくクリアな色が肌をフレッシュに見せるイエベタイプ。春らしい軽やかさやポップさが得意で、明るいデニムや白小物との相性が抜群です。",
+    recommend: ["コーラル", "ピーチ", "アイボリー", "明るいベージュ", "ライトグリーン", "オレンジ"],
+    avoid: ["くすんだ色", "暗すぎる色", "真っ黒"],
+    tip: "明るく澄んだ色を選ぶと、肌のツヤと透明感が出ます。",
+    coordExample: "アイボリーのブラウス＋明るいデニム＋ゴールド小物",
+  },
+  "サマー": {
+    description: "柔らかく透明感のある色が似合うブルベタイプ。淡い色や少しスモーキーなトーンで、上品で清楚な雰囲気が作れます。",
+    recommend: ["ラベンダー", "ローズピンク", "スモーキーブルー", "ミントグリーン", "グレージュ"],
+    avoid: ["鮮やかな暖色", "オレンジ", "蛍光色"],
+    tip: "白っぽい柔らかい色を選ぶと、清楚で上品な印象が出ます。",
+    coordExample: "ラベンダーのカーディガン＋白トップス＋ライトグレーのスカート",
+  },
+  "オータム": {
+    description: "深みと温かみのある色が似合うイエベタイプ。アースカラーやこっくりした色を使うと、こなれて大人っぽい雰囲気に。",
+    recommend: ["テラコッタ", "マスタード", "カーキ", "ブラウン", "ボルドー", "オリーブ"],
+    avoid: ["蛍光色", "明るすぎるパステル", "純白"],
+    tip: "アースカラーや深い色を選ぶと、洗練された大人っぽさが出ます。",
+    coordExample: "ブラウンのシャツ＋カーキのワイドパンツ＋レザー小物",
+  },
+  "ウィンター": {
+    description: "ハッキリした色やコントラストの効いた色が映えるブルベタイプ。鮮やかな色と白黒のメリハリで、シャープでかっこいい印象が作れます。",
+    recommend: ["ロイヤルブルー", "マゼンタ", "ピュアホワイト", "ブラック", "ワインレッド", "ネイビー"],
+    avoid: ["アースカラー", "オフホワイト", "くすんだ色"],
+    tip: "はっきりした色や白黒のメリハリで、一気に垢抜けます。",
+    coordExample: "白シャツ＋ブラックのストレートデニム＋差し色の赤小物",
+  },
+};
+
+// 楽天市場の検索URLを作る
+// 楽天アフィリエイトIDが取得できたら、URLにIDパラメータを足すだけで収益化できる
+const buildRakutenSearchUrl = (keyword) => {
+  const encoded = encodeURIComponent(keyword);
+  return `https://search.rakuten.co.jp/search/mall/${encoded}/`;
+};
+
+// 今の月から季節を判定する
+const getCurrentSeason = () => {
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month >= 3 && month <= 5) return "春";
+  if (month >= 6 && month <= 8) return "夏";
+  if (month >= 9 && month <= 11) return "秋";
+  return "冬";
+};
+
+// ═══════════════════════════════════════════════════════════════
 // サンプル診断データ（AI呼び出し失敗時のフォールバック用）
 // ═══════════════════════════════════════════════════════════════
 const sampleAnalysis = (eightType="フェミニン", bone="ウェーブ", pc="スプリング") => ({
@@ -732,10 +871,8 @@ export default function HyokaApp() {
             <>
               <AIAnalysisCard analysis={analysisResult}/>
 
-              {/* TODO: ここに「季節・TPO別の商品提案」セクションを追加予定
-                  - 春夏秋冬 × シーン別のアイテム推薦
-                  - 楽天・Amazonアフィリエイトリンク埋め込み
-                  - タイプ（8タイプ/骨格/パーソナルカラー）に応じたフィルタ */}
+              {/* 🛍 商品提案セクション（診断結果の直後に表示） */}
+              <ProductRecommendationSection analysis={analysisResult}/>
 
               <div style={{padding:"14px",borderRadius:16,
                 background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
@@ -969,6 +1106,214 @@ export default function HyokaApp() {
           setMode(t);
         }}/>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🛍 ProductRecommendationSection
+//   診断結果に基づいて、似合うアイテムを論理的に説明するセクション
+//   骨格 × カテゴリで「形」を提案、パーソナルカラーで「色」を提案
+//   各カテゴリに楽天検索リンクを添える（アフィリエイトIDなしで動作、
+//   後でID追加するだけで収益化できる）
+// ═══════════════════════════════════════════════════════════════
+function ProductRecommendationSection({ analysis }) {
+  const boneType = analysis?.bone?.primary;
+  const pcType = analysis?.personalColor?.primary;
+
+  // 必要なデータが揃っていない場合は表示しない
+  if (!boneType || !pcType) return null;
+  const boneRecs = BONE_RECOMMENDATIONS[boneType];
+  const colorGuide = PC_COLOR_GUIDE[pcType];
+  if (!boneRecs || !colorGuide) return null;
+
+  const season = getCurrentSeason();
+  const categories = ["トップス", "ボトムス", "アウター"];
+  const boneTypeData = BONE_TYPES.find(b => b.label === boneType);
+  const pcTypeData = PC_TYPES.find(p => p.label === pcType);
+
+  return (
+    <div style={{borderRadius:18, overflow:"hidden",
+      background:"linear-gradient(145deg,rgba(251,191,36,0.08),rgba(244,114,182,0.05))",
+      border:"1px solid rgba(251,191,36,0.25)"}}>
+
+      {/* ヘッダー */}
+      <div style={{padding:"14px 16px",
+        background:"linear-gradient(135deg,rgba(251,191,36,0.2),rgba(244,114,182,0.15))",
+        borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{fontSize:14, fontWeight:900,
+          background:"linear-gradient(135deg,#fbbf24,#f472b6)",
+          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
+          🛍 あなたに似合うアイテム
+        </div>
+        <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
+          {season}の今、{boneType}×{pcType}のあなたに似合う服を、
+          <span style={{color:"#fbbf24", fontWeight:700}}>「なぜ似合うのか」</span>
+          という理由つきで紹介します✨
+        </div>
+      </div>
+
+      <div style={{padding:"16px"}}>
+
+        {/* あなたの体型・色の特徴 */}
+        <div style={{padding:"14px", borderRadius:14, marginBottom:16,
+          background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+          <div style={{fontSize:11, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:10}}>
+            👤 あなたの体型・色の特徴
+          </div>
+
+          <div style={{display:"flex", gap:8, marginBottom:10, flexWrap:"wrap"}}>
+            <span style={{padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:800, color:"#fff",
+              background: boneTypeData?.grad || "linear-gradient(135deg,#34d399,#06b6d4)"}}>
+              🦴 {boneType}
+            </span>
+            <span style={{padding:"4px 12px", borderRadius:20, fontSize:11, fontWeight:800, color:"#fff",
+              background: pcTypeData?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)"}}>
+              🎨 {pcType}
+            </span>
+          </div>
+
+          <div style={{fontSize:12, color:"rgba(255,255,255,0.75)", lineHeight:1.7}}>
+            {boneTypeData?.feature}
+          </div>
+          <div style={{fontSize:12, color:"rgba(255,255,255,0.75)", lineHeight:1.7, marginTop:6}}>
+            {colorGuide.description}
+          </div>
+        </div>
+
+        {/* カテゴリごとの提案 */}
+        {categories.map((category, idx) => {
+          const rec = boneRecs[category];
+          if (!rec) return null;
+          const searchKeyword = `${rec.searchKeyword} ${season}`;
+          const searchUrl = buildRakutenSearchUrl(searchKeyword);
+
+          return (
+            <div key={category} style={{marginTop: idx === 0 ? 0 : 18}}>
+
+              {/* カテゴリ見出し */}
+              <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
+                <div style={{width:4, height:18, borderRadius:2,
+                  background:"linear-gradient(180deg,#fbbf24,#f472b6)"}}/>
+                <div style={{fontSize:13, fontWeight:900, color:"#fff"}}>
+                  📌 {category}：<span style={{color:"#fbbf24"}}>{rec.itemName}</span>
+                </div>
+              </div>
+
+              {/* なぜ似合うのか */}
+              <div style={{padding:"12px 14px", borderRadius:12,
+                background:"rgba(251,191,36,0.06)",
+                border:"1px solid rgba(251,191,36,0.2)", marginBottom:8}}>
+                <div style={{fontSize:10, fontWeight:800, color:"#fbbf24", marginBottom:6}}>
+                  ✨ なぜ似合うのか
+                </div>
+                <div style={{fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.7}}>
+                  {rec.whyFits}
+                </div>
+              </div>
+
+              {/* 避けたいもの */}
+              <div style={{padding:"12px 14px", borderRadius:12,
+                background:"rgba(244,63,94,0.06)",
+                border:"1px solid rgba(244,63,94,0.2)", marginBottom:8}}>
+                <div style={{fontSize:10, fontWeight:800, color:"#f87171", marginBottom:6}}>
+                  ⚠️ 避けたいもの
+                </div>
+                <div style={{fontSize:12, color:"rgba(255,255,255,0.85)", lineHeight:1.7}}>
+                  {rec.avoid}
+                </div>
+              </div>
+
+              {/* 選ぶときのチェックリスト */}
+              <div style={{padding:"12px 14px", borderRadius:12,
+                background:"rgba(139,92,246,0.06)",
+                border:"1px solid rgba(139,92,246,0.2)", marginBottom:8}}>
+                <div style={{fontSize:10, fontWeight:800, color:"#c084fc", marginBottom:8}}>
+                  ✓ 選ぶときのチェックリスト
+                </div>
+                <div style={{display:"flex", flexDirection:"column", gap:5}}>
+                  {rec.checklist.map((item, i) => (
+                    <div key={i} style={{fontSize:11, color:"rgba(255,255,255,0.75)", lineHeight:1.6,
+                      paddingLeft:10, position:"relative"}}>
+                      <span style={{position:"absolute", left:0, color:"#c084fc"}}>•</span>
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 楽天検索リンク（アフィリエイトIDは後付け） */}
+              <a href={searchUrl} target="_blank" rel="noopener noreferrer"
+                style={{textDecoration:"none", display:"block"}}>
+                <div style={{padding:"11px 14px", borderRadius:12,
+                  background:"linear-gradient(135deg,#bf0000,#e60012)",
+                  display:"flex", alignItems:"center", justifyContent:"space-between",
+                  boxShadow:"0 3px 12px rgba(191,0,0,0.3)"}}>
+                  <span style={{fontSize:12, fontWeight:800, color:"#fff"}}>
+                    👉 楽天で「{searchKeyword}」を見る
+                  </span>
+                  <span style={{fontSize:14, color:"#fff", opacity:0.8}}>↗</span>
+                </div>
+              </a>
+            </div>
+          );
+        })}
+
+        {/* カラーガイド（最後にまとめて） */}
+        <div style={{marginTop:18, padding:"14px", borderRadius:14,
+          background: pcTypeData?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)",
+          color:"#fff"}}>
+          <div style={{fontSize:11, fontWeight:800, opacity:0.9, marginBottom:8}}>
+            🎨 {pcType}のあなたに似合う色
+          </div>
+
+          <div style={{fontSize:12, lineHeight:1.7, marginBottom:10}}>
+            {colorGuide.tip}
+          </div>
+
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:10, opacity:0.85, marginBottom:5, fontWeight:700}}>✓ おすすめの色</div>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+              {colorGuide.recommend.map((c, i) => (
+                <span key={i} style={{padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700,
+                  background:"rgba(255,255,255,0.2)",
+                  border:"1px solid rgba(255,255,255,0.3)"}}>{c}</span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{fontSize:10, opacity:0.85, marginBottom:5, fontWeight:700}}>✗ 避けたい色</div>
+            <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
+              {colorGuide.avoid.map((c, i) => (
+                <span key={i} style={{padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700,
+                  background:"rgba(0,0,0,0.2)",
+                  border:"1px solid rgba(255,255,255,0.2)"}}>{c}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* 春の今っぽいコーデ例（10〜20代向け） */}
+          {colorGuide.coordExample && (
+            <div style={{marginTop:12, padding:"10px 12px", borderRadius:10,
+              background:"rgba(0,0,0,0.18)", border:"1px solid rgba(255,255,255,0.2)"}}>
+              <div style={{fontSize:10, opacity:0.85, marginBottom:5, fontWeight:700}}>👗 {season}の今っぽいコーデ例</div>
+              <div style={{fontSize:12, fontWeight:700, lineHeight:1.6}}>
+                {colorGuide.coordExample}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* フッター注意書き */}
+        <div style={{marginTop:14, padding:"10px 12px", borderRadius:10,
+          background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+          <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6}}>
+            💡 アイテムの提案は骨格診断・パーソナルカラー理論に基づいた一般的な指針です。
+            最終的にはあなたが「着てみて気分が上がるもの」が一番です。
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
