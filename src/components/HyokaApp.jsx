@@ -993,7 +993,7 @@ export default function HyokaApp() {
             </p>
           </div>
 
-          <label htmlFor="home-image-upload" style={{display:"block",cursor:"pointer"}}>
+          <label htmlFor="home-image-upload" style={{display:"block",cursor:"pointer",position:"relative"}}>
             <div style={{
               width:"100%",aspectRatio:"1",borderRadius:28,
               border:"2px solid rgba(139,92,246,0.4)",
@@ -1010,6 +1010,31 @@ export default function HyokaApp() {
                   </div>
               }
             </div>
+            {/* 🆕 アップロード済み画像を削除する×ボタン */}
+            {uploadedImg && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (window.confirm("この画像を削除しますか？")) {
+                    setUploadedImg(null);
+                    setAnalysisResult(null);
+                    showToast("🗑 画像を削除しました");
+                  }
+                }}
+                aria-label="アップロードした画像を削除"
+                style={{
+                  position:"absolute", top:12, right:12,
+                  width:38, height:38, borderRadius:"50%",
+                  border:"1px solid rgba(255,255,255,0.2)",
+                  background:"rgba(0,0,0,0.6)", backdropFilter:"blur(8px)",
+                  color:"#fff", fontSize:18, fontWeight:900,
+                  cursor:"pointer", display:"flex",
+                  alignItems:"center", justifyContent:"center",
+                  boxShadow:"0 2px 10px rgba(0,0,0,0.4)", zIndex:5,
+                }}>×</button>
+            )}
           </label>
           <input
             id="home-image-upload"
@@ -1222,6 +1247,50 @@ export default function HyokaApp() {
               }}>
                 <span>🔐 プライバシーポリシー</span>
                 <span style={{opacity:0.4}}>›</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 🆕 データ管理セクション（プライバシー強化） */}
+          <div style={{marginTop:20}}>
+            <div style={{fontSize:10, color:"rgba(255,255,255,0.35)", marginBottom:10, fontWeight:700, paddingLeft:4}}>
+              ⚠️ データ管理
+            </div>
+            <div style={{display:"flex", flexDirection:"column", gap:8}}>
+              <div style={{
+                padding:"12px 14px", borderRadius:12,
+                background:"rgba(255,255,255,0.03)",
+                border:"1px solid rgba(255,255,255,0.06)",
+                fontSize:11, color:"rgba(255,255,255,0.5)", lineHeight:1.6,
+              }}>
+                💡 このアプリではあなたの画像と診断結果はあなたの端末（ブラウザ）にのみ保存されています。サーバーには送信されません。下のボタンですべてのデータを完全に削除できます。
+              </div>
+              <button
+                onClick={() => {
+                  const count = aiOnlyHistory.length;
+                  if (count === 0 && !uploadedImg) {
+                    showToast("削除するデータはありません");
+                    return;
+                  }
+                  const msg = `すべてのデータを削除します。\n\n・診断履歴 ${count}件\n・アップロード中の画像\n\nこの操作は取り消せません。本当に削除しますか？`;
+                  if (window.confirm(msg)) {
+                    setAiOnlyHistory([]);
+                    setUploadedImg(null);
+                    setAnalysisResult(null);
+                    setAiHistoryTypeFilter(null);
+                    showToast("🗑 すべてのデータを削除しました");
+                  }
+                }}
+                style={{
+                  padding:"14px 16px", borderRadius:12,
+                  background:"rgba(239,68,68,0.08)",
+                  border:"1px solid rgba(239,68,68,0.3)",
+                  color:"#fca5a5", fontSize:13, fontWeight:700,
+                  textAlign:"left", cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"space-between",
+                }}>
+                <span>🗑 すべてのデータを削除する</span>
+                <span style={{opacity:0.6}}>›</span>
               </button>
             </div>
           </div>
