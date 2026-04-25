@@ -9,7 +9,8 @@ import {
   PC4_TO_PC16,
   DEFAULT_PC4_REPRESENTATIVE,
 } from "./styleGuideData";
-import { TermsContent, PrivacyContent } from "./legalContent";  // 🆕 この行を追加
+import { TermsContent, PrivacyContent } from "./legalContent";
+import { ProductShowcase } from "./productCatalog";  // 🆕 この行を追加
 // ═══════════════════════════════════════════════════════════════
 // タイプ定義
 // ═══════════════════════════════════════════════════════════════
@@ -1025,11 +1026,14 @@ export default function HyokaApp() {
             <>
               <AIAnalysisCard analysis={analysisResult}/>
 
-              {/* 🌟 384通り対応・統合スタイルアドバイス（5タブ：全体/形/色/春/ヘア） */}
+             {/* 🌟 384通り対応・統合スタイルアドバイス（5タブ：全体/形/色/春/ヘア） */}
               <StyleAdviceHub analysis={analysisResult}/>
 
               {/* 🛍 買い物ガイド（楽天検索リンク付きの購入提案） */}
               <BuyGuideCard analysis={analysisResult}/>
+
+              {/* 🆕 ✨ 商品提案セクション（季節×骨格別の具体商品カード） */}
+              <ProductShowcase analysis={analysisResult}/>
 
               <div style={{padding:"14px",borderRadius:16,
                 background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)"}}>
@@ -1140,10 +1144,11 @@ export default function HyokaApp() {
                   <div style={{marginTop:12, display:"flex", flexDirection:"column", gap:12}}>
                     <StyleAdviceHub analysis={item.analysis}/>
                     <BuyGuideCard analysis={item.analysis}/>
+                    {/* 🆕 商品提案セクション */}
+                    <ProductShowcase analysis={item.analysis}/>
                   </div>
                 </Glass>
               ))
-            )}
 
             {aiOnlyHistory.length>0 && (
               <button onClick={()=>{
