@@ -173,10 +173,15 @@ const PC_COLOR_GUIDE = {
 };
 
 // 楽天市場の検索URLを作る
-// 楽天アフィリエイトIDが取得できたら、URLにIDパラメータを足すだけで収益化できる
+// アフィリエイトIDを使用してアフィリエイトリンクとして発行する
+const RAKUTEN_AFFILIATE_ID = "532f53ca.02addeb3.532f53cb.ef93f387";
 const buildRakutenSearchUrl = (keyword) => {
   const encoded = encodeURIComponent(keyword);
-  return `https://search.rakuten.co.jp/search/mall/${encoded}/`;
+  const baseUrl = `https://search.rakuten.co.jp/search/mall/${encoded}/`;
+  if (RAKUTEN_AFFILIATE_ID) {
+    return `https://hb.afl.rakuten.co.jp/hgc/${RAKUTEN_AFFILIATE_ID}/?pc=${encodeURIComponent(baseUrl)}`;
+  }
+  return baseUrl;
 };
 
 // 今の月から季節を判定する
