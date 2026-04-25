@@ -9,7 +9,7 @@ import {
   PC4_TO_PC16,
   DEFAULT_PC4_REPRESENTATIVE,
 } from "./styleGuideData";
-
+import { TermsContent, PrivacyContent } from "./legalContent";  // 🆕 この行を追加
 // ═══════════════════════════════════════════════════════════════
 // タイプ定義
 // ═══════════════════════════════════════════════════════════════
@@ -1184,14 +1184,43 @@ export default function HyokaApp() {
             </GradBtn>
           </div>
 
+          {/* 🆕 法的書類セクション */}
+          <div style={{marginTop:20}}>
+            <div style={{fontSize:10, color:"rgba(255,255,255,0.35)", marginBottom:10, fontWeight:700, paddingLeft:4}}>
+              📋 サービスについて
+            </div>
+            <div style={{display:"flex", flexDirection:"column", gap:8}}>
+              <button onClick={()=>setMode("terms")} style={{
+                padding:"12px 16px", borderRadius:12,
+                background:"rgba(255,255,255,0.04)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                color:"rgba(255,255,255,0.7)", fontSize:13, fontWeight:600,
+                textAlign:"left", cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"space-between",
+              }}>
+                <span>📄 利用規約</span>
+                <span style={{opacity:0.4}}>›</span>
+              </button>
+              <button onClick={()=>setMode("privacy")} style={{
+                padding:"12px 16px", borderRadius:12,
+                background:"rgba(255,255,255,0.04)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                color:"rgba(255,255,255,0.7)", fontSize:13, fontWeight:600,
+                textAlign:"left", cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"space-between",
+              }}>
+                <span>🔐 プライバシーポリシー</span>
+                <span style={{opacity:0.4}}>›</span>
+              </button>
+            </div>
+          </div>
+
           {/* TODO: 今後ここに追加予定のメニュー
-              - 利用規約・プライバシーポリシー
               - AIキー設定（本物のAI診断を使うため）
               - お気に入り商品（アフィリエイト実装後）
           */}
         </div>
       )}
-
       {/* INVITE */}
       {mode==="invite" && (
         <div style={{position:"relative",zIndex:1,padding:"36px 24px 60px",display:"flex",flexDirection:"column",gap:20}}>
@@ -1253,7 +1282,7 @@ export default function HyokaApp() {
             </div>
           </Glass>
 
-          <div style={{padding:"14px 16px",borderRadius:14,
+         <div style={{padding:"14px 16px",borderRadius:14,
             background:"rgba(255,200,100,0.08)",border:"1px solid rgba(255,200,100,0.2)"}}>
             <div style={{fontSize:11,fontWeight:800,color:"#fbbf24",marginBottom:6}}>⚠️ 共有する前に</div>
             <div style={{fontSize:11,color:"rgba(255,255,255,0.6)",lineHeight:1.7}}>
@@ -1261,6 +1290,16 @@ export default function HyokaApp() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 🆕 TERMS — 利用規約 */}
+      {mode==="terms" && (
+        <TermsContent BackBtn={BackBtn} onBack={()=>setMode("mypage")} />
+      )}
+
+      {/* 🆕 PRIVACY — プライバシーポリシー */}
+      {mode==="privacy" && (
+        <PrivacyContent BackBtn={BackBtn} onBack={()=>setMode("mypage")} />
       )}
 
       {isMainTab && (
