@@ -327,10 +327,10 @@ export function PrivacyContent({ BackBtn, onBack }) {
       </p>
       <ul style={styles.ul}>
         <li style={styles.li}>
-          <span style={styles.strong}>Anthropic, PBC(米国)</span>：本サービスのAI診断は、AnthropicのClaude APIを利用しています。
+          <span style={styles.strong}>Google LLC(米国)</span>：本サービスのAI診断は、GoogleのGemini APIを利用しています。
           <br />
-          <a href="https://www.anthropic.com/legal/privacy" target="_blank" rel="noopener noreferrer" style={styles.link}>
-            Anthropicのプライバシーポリシー
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" style={styles.link}>
+            Googleのプライバシーポリシー
           </a>
         </li>
       </ul>
@@ -338,7 +338,8 @@ export function PrivacyContent({ BackBtn, onBack }) {
       <ul style={styles.ul}>
         <li style={styles.li}>アップロードされた画像および診断結果は、原則として<span style={styles.strong}>ユーザーのブラウザ内(ローカルストレージ)にのみ保存</span>されます。</li>
         <li style={styles.li}>当方のサーバーには画像を保存しません。</li>
-        <li style={styles.li}>AI APIに送信された画像は、各事業者のポリシーに従って取り扱われます(一般的に、API経由で送信されたデータはモデル学習には利用されません)。</li>
+        <li style={styles.li}>AI APIに送信された画像は、各事業者のポリシーに従って取り扱われます。</li>
+        <li style={styles.li}><span style={styles.strong}>本サービスはGemini APIの無料枠を利用しているため、送信された画像および診断結果は、Googleによってサービスの改善およびAIモデルの学習に利用される場合があります</span>。これに同意いただけない場合は、本サービスのご利用をお控えください。詳細は<a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener noreferrer" style={styles.link}>Gemini APIの追加利用規約</a>をご確認ください。</li>
       </ul>
       <p style={styles.p}><span style={styles.strong}>(3) 削除</span></p>
       <ul style={styles.ul}>
@@ -366,7 +367,7 @@ export function PrivacyContent({ BackBtn, onBack }) {
         本サービスの提供のため、以下の事業者にデータの処理を委託しています。
       </p>
       <ul style={styles.ul}>
-        <li style={styles.li}><span style={styles.strong}>Anthropic, PBC</span>：AI画像分析(Claude API) ／ 米国</li>
+        <li style={styles.li}><span style={styles.strong}>Google LLC</span>：AI画像分析(Gemini API) ／ 米国</li>
         <li style={styles.li}><span style={styles.strong}>Vercel Inc.</span>：ウェブサイトのホスティング・配信 ／ 米国</li>
       </ul>
       <p style={styles.p}>
