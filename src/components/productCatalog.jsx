@@ -218,7 +218,7 @@ export const PRODUCT_CATALOG = {
           "ハイゲージニット Vネック レディース"),
       ],
       "ボトムス": [
-        p("aut-st-bot-1","ストレートデニム（濃色）","GU",2990,"denim",["普段着","通学","お出かけ"],
+        p("aut-st-bot-1","ストレートデニム(濃色)","GU",2990,"denim",["普段着","通学","お出かけ"],
           "深い色のデニムでシュッと見せる。ストレートさんの脚を綺麗に縦長に。",
           "ストレートデニム 濃色 レディース"),
       ],
@@ -268,7 +268,7 @@ export const PRODUCT_CATALOG = {
   "冬": {
     "ストレート": {
       "トップス": [
-        p("wnt-st-top-1","タートルネックニット（薄手）","ユニクロ",2990,"black",["きれいめ","通学","お出かけ"],
+        p("wnt-st-top-1","タートルネックニット(薄手)","ユニクロ",2990,"black",["きれいめ","通学","お出かけ"],
           "首元すっきりの薄手タートル。ストレートさんは厚手より薄手のほうがすっきり見えます。",
           "タートルネックニット 薄手 レディース"),
       ],
@@ -307,7 +307,7 @@ export const PRODUCT_CATALOG = {
           "ハイネックニット オーバーサイズ レディース"),
       ],
       "ボトムス": [
-        p("wnt-nt-bot-1","ワイドコーデュロイパンツ（ロング）","studio CLIP",5990,"brown",["普段着","お出かけ"],
+        p("wnt-nt-bot-1","ワイドコーデュロイパンツ(ロング)","studio CLIP",5990,"brown",["普段着","お出かけ"],
           "暖かい素材＋ワイドシルエットで冬のナチュラルさんに最適。フルレングスでスタイルアップ。",
           "コーデュロイパンツ ワイド ロング レディース"),
       ],
@@ -442,9 +442,11 @@ function ProductCard({ product }) {
 // ═══════════════════════════════════════════════════════════════
 //   AIAnalysisCard / StyleAdviceHub / BuyGuideCard の下に配置する想定。
 //   骨格タイプを元に、現在の季節の商品を3カテゴリ分横スクロールで表示。
+//   🆕 ヘッダークリックで開閉できる折り畳み機能つき。
 // ═══════════════════════════════════════════════════════════════
 export function ProductShowcase({ analysis }) {
-  const [open, setOpen] = useState(true); // 🆕 折り畳み用 state（早期 return より前）
+  // 🆕 折り畳み用 state（早期 return より前に置くのが大事！）
+  const [open, setOpen] = useState(true);
 
   const boneType = analysis?.bone?.primary;
   if (!boneType) return null;
@@ -461,7 +463,7 @@ export function ProductShowcase({ analysis }) {
       background:"linear-gradient(145deg,rgba(244,114,182,0.08),rgba(139,92,246,0.06))",
       border:"1px solid rgba(244,114,182,0.22)"}}>
 
-      {/* ヘッダー（クリックで開閉） */}
+      {/* 🆕 ヘッダー（クリックで開閉） */}
       <div onClick={()=>setOpen(o=>!o)}
         style={{padding:"14px 16px", cursor:"pointer",
           background:"linear-gradient(135deg,rgba(244,114,182,0.2),rgba(139,92,246,0.15))",
@@ -483,53 +485,53 @@ export function ProductShowcase({ analysis }) {
         </div>
       </div>
 
+      {/* 🆕 中身全体を open でくくる */}
       {open && (
         <div style={{padding:"16px 0"}}>
           {categories.map((category, idx) => {
-            // ...（ここから下は元のまま）
-          const items = data[category] || [];
-          if (items.length === 0) return null;
+            const items = data[category] || [];
+            if (items.length === 0) return null;
 
-          return (
-            <div key={category} style={{marginTop: idx === 0 ? 0 : 18}}>
-              {/* カテゴリ見出し */}
-              <div style={{padding:"0 16px", marginBottom:10,
-                display:"flex", alignItems:"center", gap:8}}>
-                <div style={{width:4, height:18, borderRadius:2,
-                  background:"linear-gradient(180deg,#f472b6,#a78bfa)"}}/>
-                <div style={{fontSize:13, fontWeight:900, color:"#fff"}}>
-                  {categoryEmoji[category]} {category}
+            return (
+              <div key={category} style={{marginTop: idx === 0 ? 0 : 18}}>
+                {/* カテゴリ見出し */}
+                <div style={{padding:"0 16px", marginBottom:10,
+                  display:"flex", alignItems:"center", gap:8}}>
+                  <div style={{width:4, height:18, borderRadius:2,
+                    background:"linear-gradient(180deg,#f472b6,#a78bfa)"}}/>
+                  <div style={{fontSize:13, fontWeight:900, color:"#fff"}}>
+                    {categoryEmoji[category]} {category}
+                  </div>
+                  <div style={{fontSize:10, color:"rgba(255,255,255,0.4)", marginLeft:"auto"}}>
+                    {items.length}点 ›
+                  </div>
                 </div>
-                <div style={{fontSize:10, color:"rgba(255,255,255,0.4)", marginLeft:"auto"}}>
-                  {items.length}点 ›
+
+                {/* 商品横スクロール */}
+                <div style={{
+                  display:"flex", gap:10, overflowX:"auto", paddingBottom:6,
+                  paddingLeft:16, paddingRight:16,
+                  scrollSnapType:"x mandatory",
+                  WebkitOverflowScrolling:"touch",
+                }}>
+                  {items.map(product => (
+                    <ProductCard key={product.id} product={product}/>
+                  ))}
                 </div>
               </div>
+            );
+          })}
 
-              {/* 商品横スクロール */}
-              <div style={{
-                display:"flex", gap:10, overflowX:"auto", paddingBottom:6,
-                paddingLeft:16, paddingRight:16,
-                scrollSnapType:"x mandatory",
-                WebkitOverflowScrolling:"touch",
-              }}>
-                {items.map(product => (
-                  <ProductCard key={product.id} product={product}/>
-                ))}
-              </div>
+          {/* 注意書き */}
+          <div style={{margin:"14px 16px 0", padding:"10px 12px", borderRadius:10,
+            background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
+            <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6}}>
+              💡 商品は一例です。リンク先の楽天市場で類似アイテムも探せます。
+              価格は変動する場合があります。掲載商品は当サイトが選定したサンプルです。
             </div>
-          );
-        })}
-
-        {/* 注意書き */}
-        <div style={{margin:"14px 16px 0", padding:"10px 12px", borderRadius:10,
-          background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
-          <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6}}>
-            💡 商品は一例です。リンク先の楽天市場で類似アイテムも探せます。
-            価格は変動する場合があります。掲載商品は当サイトが選定したサンプルです。
           </div>
         </div>
-      </div
-       )} 
+      )}
     </div>
   );
 }
