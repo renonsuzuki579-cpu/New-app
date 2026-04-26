@@ -1,44 +1,92 @@
 // ═══════════════════════════════════════════════════════════════
-// 🛍 productCatalog.jsx
+// 🛍 productCatalog.jsx（楽天API連携版）
 // ═══════════════════════════════════════════════════════════════
 // 役割：
 //   診断結果ページに並べる「具体的な商品カード」のデータと表示。
-//   現在は仮データ（モック）。楽天/Amazonアフィリエイトの審査が
-//   通ったら、各商品の `affiliateUrl` を本物のリンクに差し替える
-//   だけで収益化に切り替わるように設計してあります。
 //
-// 構造：
-//   PRODUCT_CATALOG[季節][骨格][カテゴリ] = [商品配列]
+// 仕組み：
+//   ・モック（PRODUCT_CATALOG）: searchKeyword・解説文（why）・TPOタグを保持。
+//     これは編集の手作業で価値を入れた部分なので必ず残す。
+//   ・楽天API: searchKeywordを使って実商品（名前・画像・価格・URL）を取得。
+//   ・カード表示時: 実商品が取れたらそれを表示、取れなければモックの体裁で表示。
 //
-// 後で書き換えるポイント：
-//   ① CATALOG_CONFIG.rakutenAffiliateId にIDを入れる
-//   ② 各商品の affiliateUrl を本物のリンクに差し替える
-//   ③ image を本物の商品画像URLに差し替える
+// データフロー：
+//   ProductCard マウント
+//     → /api/rakuten-products?keyword=... を fetch
+//     → 取れた1件目を上書きして表示
+//     → 取れなければモックのまま（プレースホルダー＋楽天検索URL）
+//
+// キャッシュ：
+//   同じkeywordへの重複呼び出しを防ぐ module-level Map。
+//   ページ再読み込みでクリア（軽量に）。
 // ═══════════════════════════════════════════════════════════════
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-// ───────── 設定（あとで書き換えるところ） ─────────
+// ───────── 設定 ─────────
 export const CATALOG_CONFIG = {
-  // 楽天アフィリエイトID
+  // 楽天アフィリエイトID（フォールバック用、検索URL生成に使用）
   rakutenAffiliateId: "532f53ca.02addeb3.532f53cb.ef93f387",
   // Amazonアソシエイトタグ（取得後にここを書き換える）
   amazonAssociateTag: "",
 };
 
-// 楽天検索URLビルダー（アフィリエイトID対応）
+// 楽天検索URLビルダー（API取得失敗時のフォールバック）
 export const buildRakutenAffiliateUrl = (keyword) => {
   const encoded = encodeURIComponent(keyword);
   const baseUrl = `https://search.rakuten.co.jp/search/mall/${encoded}/`;
-  // 将来：affiliateId が入っていれば自動でアフィリンクに変換
   if (CATALOG_CONFIG.rakutenAffiliateId) {
     return `https://hb.afl.rakuten.co.jp/hgc/${CATALOG_CONFIG.rakutenAffiliateId}/?pc=${encodeURIComponent(baseUrl)}`;
   }
   return baseUrl;
 };
 
+// ═══════════════════════════════════════════════════════════════
+// 🔁 楽天API取得＆キャッシュ
+// ═══════════════════════════════════════════════════════════════
+// 同じキーワードで何度も叩かないようにするための単純キャッシュ。
+// Mapを使うので、同一ページ内の再レンダリングでは即時返る。
+const productCache = new Map();
+// 進行中のfetchをキーごとに記録して、同時呼び出しを1本にまとめる
+const inFlight = new Map();
+
+async function fetchRakutenItem(searchKeyword) {
+  if (!searchKeyword) return null;
+
+  // キャッシュ済みなら即返す
+  if (productCache.has(searchKeyword)) {
+    return productCache.get(searchKeyword);
+  }
+  // 進行中なら同じPromiseを共有
+  if (inFlight.has(searchKeyword)) {
+    return inFlight.get(searchKeyword);
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(
+        `/api/rakuten-products?keyword=${encodeURIComponent(searchKeyword)}&hits=3`
+      );
+      if (!res.ok) throw new Error("api_error");
+      const data = await res.json();
+      const first = data?.items?.[0] || null;
+      productCache.set(searchKeyword, first);
+      return first;
+    } catch (err) {
+      // エラー時はnullをキャッシュしてフォールバックを誘発
+      productCache.set(searchKeyword, null);
+      return null;
+    } finally {
+      inFlight.delete(searchKeyword);
+    }
+  })();
+
+  inFlight.set(searchKeyword, promise);
+  return promise;
+}
+
 // 商品プレースホルダ画像（CSSグラデーション + 絵文字）
-// 実商品画像が用意できたら image: "https://..." に差し替える
+// 実商品画像が取得できなかった時のフォールバック
 const PLACEHOLDERS = {
   white:    { bg: "linear-gradient(135deg,#FAFAF7,#E8DDD0)", emoji: "👚", textColor: "#8B7355" },
   ivory:    { bg: "linear-gradient(135deg,#FFF8E8,#F5E8C8)", emoji: "👚", textColor: "#A88A55" },
@@ -59,16 +107,17 @@ const PLACEHOLDERS = {
 // 商品データ生成ヘルパー
 const p = (id, name, brand, price, ph, tpo, why, keyword) => ({
   id, name, brand, price,
-  image: null, // 後で本物の画像URLを入れる
+  image: null,
   imageStyle: PLACEHOLDERS[ph],
   tpo, why, searchKeyword: keyword,
-  affiliateUrl: null, // 後で本物のアフィリエイトURLを入れる
+  affiliateUrl: null,
 });
 
 // ═══════════════════════════════════════════════════════════════
-// 📦 商品カタログ（モックデータ）
+// 📦 商品カタログ（解説文・TPOタグ・検索キーワードのソース）
 // ═══════════════════════════════════════════════════════════════
-// 春は2点ずつ、他季節は1点ずつ。後から増やしやすい構造。
+// 楽天API化後も、こちらの「why」「tpo」「searchKeyword」は使う。
+// API失敗時のフォールバックとして「name」「brand」「price」も保持。
 // ═══════════════════════════════════════════════════════════════
 export const PRODUCT_CATALOG = {
 
@@ -340,13 +389,38 @@ export const pickProductsForUser = (boneType, season = null) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// 🎨 ProductCard：1商品分のカード
+// 🎨 ProductCard：1商品分のカード（楽天API実商品 or モック）
 // ═══════════════════════════════════════════════════════════════
 function ProductCard({ product }) {
-  const { name, brand, price, image, imageStyle, tpo, why, searchKeyword, affiliateUrl } = product;
+  const {
+    name: mockName, brand: mockBrand, price: mockPrice,
+    imageStyle, tpo, why, searchKeyword,
+    affiliateUrl: mockAffUrl,
+  } = product;
 
-  // 本物のアフィリエイトURLが入ってればそちら、なければ楽天検索URLを使う
-  const linkUrl = affiliateUrl || buildRakutenAffiliateUrl(searchKeyword);
+  const [realProduct, setRealProduct] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // マウント時に楽天APIから実商品を取りに行く
+  useEffect(() => {
+    let cancelled = false;
+    fetchRakutenItem(searchKeyword).then((item) => {
+      if (cancelled) return;
+      setRealProduct(item);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [searchKeyword]);
+
+  // 表示する内容（実商品があれば実商品、なければモック）
+  const isReal = !!realProduct;
+  const displayName  = realProduct?.itemName  || mockName;
+  const displayBrand = realProduct?.shopName  || mockBrand;
+  const displayPrice = realProduct?.itemPrice ?? mockPrice;
+  const displayImage = realProduct?.imageUrl  || null;
+  const displayUrl   = realProduct?.itemUrl
+                    || mockAffUrl
+                    || buildRakutenAffiliateUrl(searchKeyword);
 
   return (
     <div style={{
@@ -359,11 +433,13 @@ function ProductCard({ product }) {
       {/* 商品画像エリア */}
       <div style={{
         width:"100%", aspectRatio:"4/5",
-        background: image ? `url(${image}) center/cover` : imageStyle.bg,
+        background: displayImage
+          ? `#fff url(${displayImage}) center/cover no-repeat`
+          : imageStyle.bg,
         display:"flex", alignItems:"center", justifyContent:"center",
         position:"relative",
       }}>
-        {!image && (
+        {!displayImage && !loading && (
           <>
             <div style={{fontSize:54, opacity:0.85}}>{imageStyle.emoji}</div>
             <div style={{position:"absolute", bottom:6, right:8,
@@ -373,30 +449,46 @@ function ProductCard({ product }) {
             </div>
           </>
         )}
+        {loading && !displayImage && (
+          <div style={{fontSize:10, color:"rgba(255,255,255,0.6)", fontWeight:700,
+            background:"rgba(0,0,0,0.3)", padding:"4px 10px", borderRadius:10}}>
+            読み込み中…
+          </div>
+        )}
       </div>
 
       {/* 商品情報エリア */}
       <div style={{padding:"10px 11px 12px", display:"flex", flexDirection:"column",
         gap:6, flex:1, justifyContent:"space-between"}}>
         <div>
-          {/* ブランド */}
-          {brand && (
+          {/* ブランド/ショップ名 */}
+          {displayBrand && (
             <div style={{fontSize:9, fontWeight:700, color:"rgba(255,255,255,0.45)",
-              letterSpacing:0.3, marginBottom:3}}>
-              {brand}
+              letterSpacing:0.3, marginBottom:3,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>
+              {displayBrand}
             </div>
           )}
-          {/* 商品名 */}
+          {/* 商品名（楽天は長いので2行で省略） */}
           <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.92)",
-            lineHeight:1.4, minHeight:30, marginBottom:6}}>
-            {name}
+            lineHeight:1.4, minHeight:30, marginBottom:6,
+            display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical",
+            overflow:"hidden"}}>
+            {displayName}
           </div>
           {/* 価格 */}
           <div style={{fontSize:13, fontWeight:900,
             background:"linear-gradient(135deg,#fbbf24,#f472b6)",
             WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
             marginBottom:6}}>
-            ¥{price.toLocaleString()}
+            ¥{Number(displayPrice).toLocaleString()}
+            {!isReal && (
+              <span style={{fontSize:9, color:"rgba(255,255,255,0.35)",
+                marginLeft:4, fontWeight:600,
+                WebkitTextFillColor:"rgba(255,255,255,0.35)"}}>
+                目安
+              </span>
+            )}
           </div>
           {/* TPOタグ */}
           <div style={{display:"flex", flexWrap:"wrap", gap:3, marginBottom:6}}>
@@ -410,7 +502,7 @@ function ProductCard({ product }) {
               }}>{t}</span>
             ))}
           </div>
-          {/* なぜおすすめ */}
+          {/* なぜおすすめ（編集の解説文） */}
           <div style={{fontSize:9, color:"rgba(255,255,255,0.55)",
             lineHeight:1.5, marginTop:4,
             display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical",
@@ -420,7 +512,7 @@ function ProductCard({ product }) {
         </div>
 
         {/* 楽天で見るボタン */}
-        <a href={linkUrl} target="_blank" rel="noopener noreferrer sponsored"
+        <a href={displayUrl} target="_blank" rel="noopener noreferrer sponsored"
            style={{textDecoration:"none", marginTop:6}}>
           <div style={{
             padding:"7px 8px", borderRadius:8,
@@ -428,7 +520,9 @@ function ProductCard({ product }) {
             display:"flex", alignItems:"center", justifyContent:"center", gap:4,
             boxShadow:"0 2px 6px rgba(191,0,0,0.25)",
           }}>
-            <span style={{fontSize:10, fontWeight:800, color:"#fff"}}>楽天で見る</span>
+            <span style={{fontSize:10, fontWeight:800, color:"#fff"}}>
+              {isReal ? "楽天で買う" : "楽天で探す"}
+            </span>
             <span style={{fontSize:11, color:"#fff", opacity:0.9}}>↗</span>
           </div>
         </a>
@@ -442,10 +536,9 @@ function ProductCard({ product }) {
 // ═══════════════════════════════════════════════════════════════
 //   AIAnalysisCard / StyleAdviceHub / BuyGuideCard の下に配置する想定。
 //   骨格タイプを元に、現在の季節の商品を3カテゴリ分横スクロールで表示。
-//   🆕 ヘッダークリックで開閉できる折り畳み機能つき。
+//   ヘッダークリックで開閉できる折り畳み機能つき。
 // ═══════════════════════════════════════════════════════════════
 export function ProductShowcase({ analysis }) {
-  // 🆕 折り畳み用 state（早期 return より前に置くのが大事！）
   const [open, setOpen] = useState(true);
 
   const boneType = analysis?.bone?.primary;
@@ -463,7 +556,7 @@ export function ProductShowcase({ analysis }) {
       background:"linear-gradient(145deg,rgba(244,114,182,0.08),rgba(139,92,246,0.06))",
       border:"1px solid rgba(244,114,182,0.22)"}}>
 
-      {/* 🆕 ヘッダー（クリックで開閉） */}
+      {/* ヘッダー（クリックで開閉） */}
       <div onClick={()=>setOpen(o=>!o)}
         style={{padding:"14px 16px", cursor:"pointer",
           background:"linear-gradient(135deg,rgba(244,114,182,0.2),rgba(139,92,246,0.15))",
@@ -485,7 +578,6 @@ export function ProductShowcase({ analysis }) {
         </div>
       </div>
 
-      {/* 🆕 中身全体を open でくくる */}
       {open && (
         <div style={{padding:"16px 0"}}>
           {categories.map((category, idx) => {
@@ -526,8 +618,8 @@ export function ProductShowcase({ analysis }) {
           <div style={{margin:"14px 16px 0", padding:"10px 12px", borderRadius:10,
             background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
             <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6}}>
-              💡 商品は一例です。リンク先の楽天市場で類似アイテムも探せます。
-              価格は変動する場合があります。掲載商品は当サイトが選定したサンプルです。
+              💡 商品は楽天市場の人気アイテム（レビュー数順）から自動取得しています。
+              在庫・価格は変動します。「楽天で買う」ボタンから商品ページに移動できます。
             </div>
           </div>
         </div>
