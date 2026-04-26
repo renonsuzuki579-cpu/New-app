@@ -905,7 +905,7 @@ export default function HyokaApp() {
       if (res.ok) {
         const data = await res.json();
         if (data?.result) {
-          setAnalysisResult(data.result);
+          setAnalysisResult(normalizeAnalysis(data.result));
           if (data.demo) showToast("🎨 デモモードで診断しました");
           setAiLoading(false);
           return;
@@ -941,7 +941,7 @@ export default function HyokaApp() {
         const text = data.content?.[0]?.text?.trim() || "{}";
         const cleaned = text.replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(cleaned);
-        setAnalysisResult(parsed);
+        setAnalysisResult(normalizeAnalysis(parsed));
         setAiLoading(false);
         return;
       }
@@ -958,8 +958,7 @@ export default function HyokaApp() {
       randomPick(BONE_TYPES).label,
       randomPick(PC_TYPES).label,
     );
-    setAnalysisResult(demoResult);
-    showToast("🎨 デモモード：サンプル結果を表示しています");
+setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモード：サンプル結果を表示しています");
     setAiLoading(false);
   };
 
