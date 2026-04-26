@@ -89,7 +89,7 @@ export default async function handler(req, res) {
           },
         ],
         generationConfig: {
-          temperature: 0.7,
+          temperature: 0.2,
           maxOutputTokens: 2500,
           // JSON形式での出力を強制（パース失敗を減らす）
           responseMimeType: "application/json",
