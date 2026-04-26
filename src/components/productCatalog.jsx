@@ -528,7 +528,8 @@ export function ProductShowcase({ analysis }) {
             価格は変動する場合があります。掲載商品は当サイトが選定したサンプルです。
           </div>
         </div>
-      </div>
+      </div
+       )} 
     </div>
   );
 }
