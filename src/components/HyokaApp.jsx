@@ -11,6 +11,56 @@ import {
 } from "./styleGuideData";
 import { TermsContent, PrivacyContent } from "./legalContent";
 import { ProductShowcase } from "./productCatalog";  // 🆕 この行を追加
+
+// ═══════════════════════════════════════════════════════════════
+// 🔧 AI応答の正規化
+//   Gemini が "ウェーブタイプ" や "スプリング(イエベ春)" のように
+//   余計な文字をつけて返してきても、辞書のキーに合うよう整える。
+//   これがないと楽天リンク・髪型・メイクなどが表示されない。
+// ═══════════════════════════════════════════════════════════════
+const normalizeBone = (s) => {
+  if (!s) return s;
+  const t = String(s);
+  if (t.includes("ストレート") || /straight/i.test(t)) return "ストレート";
+  if (t.includes("ウェーブ")   || /wave/i.test(t))     return "ウェーブ";
+  if (t.includes("ナチュラル") || /natural/i.test(t))  return "ナチュラル";
+  return t;
+};
+
+const normalizePC = (s) => {
+  if (!s) return s;
+  const t = String(s);
+  if (t.includes("スプリング") || t.includes("春") || /spring/i.test(t)) return "スプリング";
+  if (t.includes("サマー")     || t.includes("夏") || /summer/i.test(t)) return "サマー";
+  if (t.includes("オータム")   || t.includes("秋") || /autumn|fall/i.test(t)) return "オータム";
+  if (t.includes("ウィンター") || t.includes("冬") || /winter/i.test(t)) return "ウィンター";
+  return t;
+};
+
+const normalizeFaceType = (s) => {
+  if (!s) return s;
+  const t = String(s).replace(/タイプ|系/g, "").trim();
+  const order = ["アクティブキュート","クールカジュアル","ソフトエレガント",
+                 "フェミニン","エレガント","フレッシュ","キュート","クール"];
+  for (const x of order) if (t.includes(x)) return x;
+  return t;
+};
+
+const normalizeAnalysis = (a) => {
+  if (!a) return a;
+  return {
+    ...a,
+    eightType: a.eightType ? { ...a.eightType, primary: normalizeFaceType(a.eightType.primary) } : a.eightType,
+    bone: a.bone ? {
+      ...a.bone,
+      primary: normalizeBone(a.bone.primary),
+      breakdown: Array.isArray(a.bone.breakdown)
+        ? a.bone.breakdown.map(x => ({ ...x, type: normalizeBone(x.type) }))
+        : a.bone.breakdown,
+    } : a.bone,
+    personalColor: a.personalColor ? { ...a.personalColor, primary: normalizePC(a.personalColor.primary) } : a.personalColor,
+  };
+};
 // ═══════════════════════════════════════════════════════════════
 // タイプ定義
 // ═══════════════════════════════════════════════════════════════
