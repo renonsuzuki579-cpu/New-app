@@ -1574,6 +1574,7 @@ function BuyGuideCard({ analysis }) {
           </div>
         </div>
       </div>
+       )}  
     </div>
   );
 }
