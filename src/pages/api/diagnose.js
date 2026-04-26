@@ -1,6 +1,18 @@
-// サーバー側プロキシ: APIキーをブラウザに晒さずにAnthropicへ中継する
-// 環境変数 ANTHROPIC_API_KEY が設定されていればリアルAI、
-// 設定されていなければデモモード（ダミーJSONを返す）で動きます。
+// ═══════════════════════════════════════════════════════════════
+// 📡 diagnose.js（Gemini API版）
+// ═══════════════════════════════════════════════════════════════
+// 役割：
+//   ブラウザから受け取った画像を、サーバー経由でGemini APIに送り、
+//   診断結果（JSON）を返す。APIキーはサーバー側の環境変数から読むので
+//   ブラウザに漏れない設計。
+//
+// 動作モード：
+//   ・環境変数 GEMINI_API_KEY が設定されている → リアルAI診断
+//   ・設定されていない / エラー → デモモード（ダミーJSONを返す）
+//
+// 使うモデル：
+//   gemini-2.5-flash（2026年4月時点の無料枠・安定版・マルチモーダル対応）
+// ═══════════════════════════════════════════════════════════════
 
 const DEMO_RESPONSE = {
   parts: {
@@ -40,11 +52,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   // デモモード：APIキーがなければダミー応答を返す
   if (!apiKey) {
-    // 少し待ってリアルっぽく
     await new Promise((r) => setTimeout(r, 1500));
     return res.status(200).json({ demo: true, result: DEMO_RESPONSE });
   }
@@ -55,40 +66,72 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "image and prompt required" });
     }
 
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+    // Gemini APIエンドポイント
+    const model = "gemini-2.5-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const geminiRes = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2500,
-        messages: [
+        contents: [
           {
             role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: "image/jpeg", data: image } },
-              { type: "text", text: prompt },
+            parts: [
+              { text: prompt },
+              {
+                inline_data: {
+                  mime_type: "image/jpeg",
+                  data: image, // base64エンコード済みの画像データ
+                },
+              },
             ],
           },
         ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2500,
+          // JSON形式での出力を強制（パース失敗を減らす）
+          responseMimeType: "application/json",
+        },
       }),
     });
 
-    const data = await anthropicRes.json();
-    if (!anthropicRes.ok) {
-      return res.status(anthropicRes.status).json({ error: data });
+    const data = await geminiRes.json();
+
+    if (!geminiRes.ok) {
+      console.error("Gemini API error:", data);
+      // エラー時もデモ応答を返してユーザー体験を壊さない
+      return res.status(200).json({
+        demo: true,
+        error: data?.error?.message || "Gemini API request failed",
+        result: DEMO_RESPONSE,
+      });
     }
 
-    const text = data.content?.[0]?.text?.trim() || "{}";
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "{}";
+    // 念のため、コードブロック記号が混じっていたら除去
     const cleaned = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(cleaned);
+
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("JSON parse error:", parseErr, "raw:", text);
+      return res.status(200).json({
+        demo: true,
+        error: "AIの応答がJSON形式ではありませんでした",
+        result: DEMO_RESPONSE,
+      });
+    }
+
     return res.status(200).json({ demo: false, result: parsed });
   } catch (err) {
     console.error("AI API error:", err);
-    // エラー時もデモ応答を返して、ユーザー体験を壊さない
-    return res.status(200).json({ demo: true, error: String(err), result: DEMO_RESPONSE });
+    return res.status(200).json({
+      demo: true,
+      error: String(err),
+      result: DEMO_RESPONSE,
+    });
   }
 }
