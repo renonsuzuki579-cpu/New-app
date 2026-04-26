@@ -1448,6 +1448,8 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
 //   側に役割分担で移しているので、ここでは買う場所への動線に集中する。
 // ═══════════════════════════════════════════════════════════════
 function BuyGuideCard({ analysis }) {
+  const [open, setOpen] = useState(true); // 🆕 折り畳み用 state（早期 return より前に置く）
+
   const boneType = analysis?.bone?.primary;
   const pcType = analysis?.personalColor?.primary;
   if (!boneType || !pcType) return null;
@@ -1462,24 +1464,33 @@ function BuyGuideCard({ analysis }) {
       background:"linear-gradient(145deg,rgba(251,191,36,0.08),rgba(244,114,182,0.05))",
       border:"1px solid rgba(251,191,36,0.25)"}}>
 
-      {/* ヘッダー */}
-      <div style={{padding:"14px 16px",
-        background:"linear-gradient(135deg,rgba(251,191,36,0.2),rgba(244,114,182,0.15))",
-        borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{fontSize:14, fontWeight:900,
-          background:"linear-gradient(135deg,#fbbf24,#f472b6)",
-          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
-          🛍 {season}に買うべきアイテム
+      {/* ヘッダー（クリックで開閉） */}
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{padding:"14px 16px", cursor:"pointer",
+          background:"linear-gradient(135deg,rgba(251,191,36,0.2),rgba(244,114,182,0.15))",
+          borderBottom: open ? "1px solid rgba(255,255,255,0.08)" : "none",
+          display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{fontSize:14, fontWeight:900,
+            background:"linear-gradient(135deg,#fbbf24,#f472b6)",
+            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
+            🛍 {season}に買うべきアイテム
+          </div>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
+            {boneType}のあなたに似合う服を、
+            <span style={{color:"#fbbf24", fontWeight:700}}>「なぜ似合うのか」</span>
+            という理由つきで紹介します。リンクから楽天で探せます✨
+          </div>
         </div>
-        <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
-          {boneType}のあなたに似合う服を、
-          <span style={{color:"#fbbf24", fontWeight:700}}>「なぜ似合うのか」</span>
-          という理由つきで紹介します。リンクから楽天で探せます✨
+        <div style={{fontSize:11, color:"rgba(255,255,255,0.5)", fontWeight:700, marginLeft:8}}>
+          {open ? "▲" : "▼"}
         </div>
       </div>
 
-      <div style={{padding:"16px"}}>
-        {categories.map((category, idx) => {
+      {open && (
+        <div style={{padding:"16px"}}>
+          {categories.map((category, idx) => {
+            // ...（ここから下は元のまま）
           const rec = boneRecs[category];
           if (!rec) return null;
           const searchKeyword = `${rec.searchKeyword} ${season}`;
