@@ -16,7 +16,7 @@
 //   ③ image を本物の商品画像URLに差し替える
 // ═══════════════════════════════════════════════════════════════
 
-import React from "react";
+import React, { useState } from "react";
 
 // ───────── 設定（あとで書き換えるところ） ─────────
 export const CATALOG_CONFIG = {
@@ -444,6 +444,8 @@ function ProductCard({ product }) {
 //   骨格タイプを元に、現在の季節の商品を3カテゴリ分横スクロールで表示。
 // ═══════════════════════════════════════════════════════════════
 export function ProductShowcase({ analysis }) {
+  const [open, setOpen] = useState(true); // 🆕 折り畳み用 state（早期 return より前）
+
   const boneType = analysis?.bone?.primary;
   if (!boneType) return null;
 
@@ -459,24 +461,32 @@ export function ProductShowcase({ analysis }) {
       background:"linear-gradient(145deg,rgba(244,114,182,0.08),rgba(139,92,246,0.06))",
       border:"1px solid rgba(244,114,182,0.22)"}}>
 
-      {/* ヘッダー */}
-      <div style={{padding:"14px 16px",
-        background:"linear-gradient(135deg,rgba(244,114,182,0.2),rgba(139,92,246,0.15))",
-        borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{fontSize:14, fontWeight:900,
-          background:"linear-gradient(135deg,#f472b6,#a78bfa)",
-          WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
-          ✨ あなた専用・{season}のおすすめアイテム
+      {/* ヘッダー（クリックで開閉） */}
+      <div onClick={()=>setOpen(o=>!o)}
+        style={{padding:"14px 16px", cursor:"pointer",
+          background:"linear-gradient(135deg,rgba(244,114,182,0.2),rgba(139,92,246,0.15))",
+          borderBottom: open ? "1px solid rgba(255,255,255,0.08)" : "none",
+          display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+        <div style={{flex:1, minWidth:0}}>
+          <div style={{fontSize:14, fontWeight:900,
+            background:"linear-gradient(135deg,#f472b6,#a78bfa)",
+            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent"}}>
+            ✨ あなた専用・{season}のおすすめアイテム
+          </div>
+          <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
+            <span style={{color:"#f472b6", fontWeight:700}}>{boneType}</span>
+            のあなたに、この季節似合う服を選びました。気になったアイテムは楽天でチェックできます🛍
+          </div>
         </div>
-        <div style={{fontSize:11, color:"rgba(255,255,255,0.55)", marginTop:4, lineHeight:1.6}}>
-          <span style={{color:"#f472b6", fontWeight:700}}>{boneType}</span>
-          のあなたに、この季節似合う服を選びました。気になったアイテムは楽天でチェックできます🛍
+        <div style={{fontSize:11, color:"rgba(255,255,255,0.5)", fontWeight:700, marginLeft:8}}>
+          {open ? "▲" : "▼"}
         </div>
       </div>
 
-      {/* カテゴリごとに横スクロール */}
-      <div style={{padding:"16px 0"}}>
-        {categories.map((category, idx) => {
+      {open && (
+        <div style={{padding:"16px 0"}}>
+          {categories.map((category, idx) => {
+            // ...（ここから下は元のまま）
           const items = data[category] || [];
           if (items.length === 0) return null;
 
