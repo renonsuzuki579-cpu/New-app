@@ -10,7 +10,8 @@ import {
   DEFAULT_PC4_REPRESENTATIVE,
 } from "./styleGuideData";
 import { TermsContent, PrivacyContent } from "./legalContent";
-import { ProductShowcase } from "./productCatalog";  // 🆕 この行を追加
+import { ProductShowcase } from "./productCatalog";
+import { DIAGNOSE_PROMPT } from "./diagnosePrompt";// 🆕 この行を追加
 
 // ═══════════════════════════════════════════════════════════════
 // 🔧 AI応答の正規化
@@ -857,39 +858,7 @@ export default function HyokaApp() {
     if (!uploadedImg) return;
     setAiLoading(true);
 
-    const prompt = `この写真の顔を観察し、以下のJSONフォーマットのみで返してください（前後の説明文不要、JSON以外は出力しない）。
-
-【観察するパーツ】eyes, eyebrows, nose, mouth, ears, balance（余白）, depth（凹凸）
-【3つの診断】
-① 8タイプ分類: キュート / フレッシュ / アクティブキュート / クールカジュアル / フェミニン / ソフトエレガント / エレガント / クール
-② 骨格: ストレート / ウェーブ / ナチュラル（上位3タイプを合計100%で配分、全身写真がない旨を明記）
-③ パーソナルカラー: スプリング / サマー / オータム / ウィンター
-
-【ルール】
-- 各パーツは25文字程度、観察ベースで「〜な傾向」「〜の印象」
-- charmは20文字以内、温かく自信が持てる言葉
-- 辛辣・否定的な表現は絶対禁止
-
-{
-  "parts": {"eyes":"...","eyebrows":"...","nose":"...","mouth":"...","ears":"...","balance":"...","depth":"..."},
-  "charm": "...",
-  "eightType": {
-    "primary": "〇〇",
-    "axes": {"age":"子供寄り|大人寄り","impression":"親しみ|かっこいい","line":"曲線|直線"},
-    "note": "観察コメント"
-  },
-  "bone": {
-    "primary": "〇〇",
-    "breakdown": [{"type":"〇〇","percentage":50},{"type":"〇〇","percentage":30},{"type":"〇〇","percentage":20}],
-    "note": "全身写真がないため参考程度です。..."
-  },
-  "personalColor": {
-    "primary": "〇〇",
-    "undertone": "イエローベース|ブルーベース",
-    "note": "判定理由",
-    "recommendedColors": ["色1","色2","色3"]
-  }
-}`;
+    const prompt = DIAGNOSE_PROMPT;  
 
     const match = uploadedImg.match(/^data:(image\/\w+);base64,(.+)$/);
     const mediaType = match ? match[1] : "image/jpeg";
