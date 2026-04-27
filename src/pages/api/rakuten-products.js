@@ -1,37 +1,40 @@
 // ═══════════════════════════════════════════════════════════════
-// 📡 rakuten-products.js
+// 📡 rakuten-products.js（新API対応版・2026年2月仕様）
 // ═══════════════════════════════════════════════════════════════
-// 役割：
-//   ブラウザから受け取ったキーワードを、サーバー経由で楽天Item Search APIに送り、
-//   実商品（商品名・画像・価格・アフィリエイトURL）を返す。
-//   applicationIdはサーバー側の環境変数から読むのでブラウザに漏れない。
+// 楽天Item Search APIを呼び出すサーバーサイドエンドポイント。
+//
+// 2026年2月10日のAPI刷新に対応：
+//   ・ドメイン: openapi.rakuten.co.jp
+//   ・パス: /ichibams/api/IchibaItem/Search/20220601
+//   ・認証: applicationId (UUID) + accessKey (pk_...) の両方が必須
+//   ・必須ヘッダー: Referer
 //
 // 動作モード：
-//   ・RAKUTEN_APPLICATION_ID が設定されている → 実商品を返す
-//   ・設定されていない / エラー → 空配列＋demo:true（フロント側でモックにフォールバック）
-//
-// 使うAPI：
-//   楽天 Ichiba Item Search API（version: 2026-04-01 / 新ドメイン版）
-//   旧 app.rakuten.co.jp は 2026年5月13日に廃止予定なので新ドメインのみ使用
+//   ・必要な環境変数が揃っている → 実商品を返す
+//   ・揃っていない / エラー → 空配列＋demo:true
+//     (フロント側で従来のモック表示にフォールバック)
 // ═══════════════════════════════════════════════════════════════
 
 const RAKUTEN_API_URL =
-  "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20260401";
+  "https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const appId = process.env.RAKUTEN_APPLICATION_ID;
-  const affId = process.env.RAKUTEN_AFFILIATE_ID;
+  const appId  = process.env.RAKUTEN_APPLICATION_ID;
+  const accKey = process.env.RAKUTEN_APPLICATION_SECRET; // pk_... で始まる
+  const affId  = process.env.RAKUTEN_AFFILIATE_ID;
 
-  // 設定がなければデモ応答（フロント側でモックにフォールバック）
-  if (!appId) {
+  // 必須キーがなければデモ応答（フロント側でモックにフォールバック）
+  if (!appId || !accKey) {
     return res.status(200).json({
       demo: true,
       items: [],
-      reason: "RAKUTEN_APPLICATION_ID not set",
+      reason: !appId
+        ? "RAKUTEN_APPLICATION_ID not set"
+        : "RAKUTEN_APPLICATION_SECRET not set",
     });
   }
 
@@ -40,46 +43,70 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "keyword (string) required" });
   }
 
+  // Refererヘッダーに使うサイトURLを決定。
+  // Vercelの環境変数 VERCEL_URL は自動で設定される（"new-app-rmmo.vercel.app" 形式、スキーマなし）
+  // それを優先して使い、なければ既知のドメインをフォールバックに。
+  const referer =
+    process.env.SITE_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://new-app-rmmo.vercel.app");
+
   try {
     const url = new URL(RAKUTEN_API_URL);
     url.searchParams.set("applicationId", appId);
+    url.searchParams.set("accessKey", accKey);          // 新APIで必須
     if (affId) url.searchParams.set("affiliateId", affId);
     url.searchParams.set("keyword", keyword);
     url.searchParams.set("hits", String(hits));
-    url.searchParams.set("sort", "-reviewCount"); // レビュー数の多い順（人気順）
-    url.searchParams.set("imageFlag", "1");        // 画像ありの商品のみ
-    url.searchParams.set("availability", "1");     // 在庫あり
-    url.searchParams.set("formatVersion", "2");    // フラットなレスポンス形式
+    url.searchParams.set("sort", "-reviewCount");        // レビュー数の多い順（人気順）
+    url.searchParams.set("imageFlag", "1");              // 画像ありの商品のみ
+    url.searchParams.set("availability", "1");           // 在庫あり
+    url.searchParams.set("format", "json");
 
-    const r = await fetch(url.toString(), { method: "GET" });
+    const r = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Referer: referer,                                // 新APIで必須
+        Origin:  referer,                                // 念のため両方
+      },
+    });
+
     const data = await r.json();
 
     if (!r.ok) {
-      console.error("Rakuten API error:", data);
+      console.error("Rakuten API error:", r.status, JSON.stringify(data));
       return res.status(200).json({
         demo: true,
         items: [],
-        error: data?.error_description || data?.error || "API request failed",
+        status: r.status,
+        error: data?.errors?.errorMessage
+            || data?.error_description
+            || data?.error
+            || `HTTP ${r.status}`,
       });
     }
 
-    // formatVersion=2 だと Items は直接 [item, item, ...] の配列
+    // formatVersion デフォルト(=1) なので Items は [{Item: {...}}, ...] という入れ子構造
     const rawItems = Array.isArray(data.Items) ? data.Items : [];
-    const items = rawItems.map((it) => ({
-      itemCode: it.itemCode,
-      itemName: it.itemName,
-      itemPrice: it.itemPrice,
-      shopName: it.shopName,
-      // 画像URLからサイズ指定（?_ex=128x128）を除去して大きめに表示できるように
-      imageUrl: cleanImageUrl(
-        pickFirst(it.mediumImageUrls) ||
-        pickFirst(it.smallImageUrls)
-      ),
-      // affiliateIdを渡しているので affiliateUrl が返ってくる
-      itemUrl: it.affiliateUrl || it.itemUrl,
-      reviewAverage: it.reviewAverage,
-      reviewCount: it.reviewCount,
-    }));
+    const items = rawItems.map((wrap) => {
+      const it = wrap?.Item || wrap || {};
+      return {
+        itemCode: it.itemCode,
+        itemName: it.itemName,
+        itemPrice: it.itemPrice,
+        shopName: it.shopName,
+        // 画像URLはサイズ指定(?_ex=128x128)を除去して大きく表示できるようにする
+        imageUrl: cleanImageUrl(
+          pickFirst(it.mediumImageUrls) ||
+          pickFirst(it.smallImageUrls)
+        ),
+        // affiliateIdを渡しているのでaffiliateUrlが自動生成されて返る
+        itemUrl: it.affiliateUrl || it.itemUrl,
+        reviewAverage: it.reviewAverage,
+        reviewCount: it.reviewCount,
+      };
+    });
 
     return res.status(200).json({ demo: false, items });
   } catch (err) {
@@ -87,7 +114,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       demo: true,
       items: [],
-      error: String(err),
+      error: String(err?.message || err),
     });
   }
 }
@@ -96,8 +123,7 @@ export default async function handler(req, res) {
 // ヘルパー
 // ───────────────────────────────────────────────
 
-// formatVersion=2 では mediumImageUrls の各要素が文字列の場合と
-// {imageUrl: "..."} オブジェクトの場合があるので両対応
+// mediumImageUrls の各要素は文字列のことも {imageUrl: "..."} の形のこともある
 function pickFirst(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return null;
   const first = arr[0];
@@ -106,8 +132,8 @@ function pickFirst(arr) {
   return null;
 }
 
-// 楽天画像URLには ?_ex=128x128 のようなサイズ指定が末尾につく。
-// これを除くとオリジナルサイズで取得でき、見栄えが良くなる。
+// 楽天画像URLには ?_ex=128x128 のようなサイズ指定が末尾に付く。
+// これを除くとオリジナルサイズで取得でき、表示が綺麗になる。
 function cleanImageUrl(url) {
   if (!url) return null;
   return String(url).replace(/\?_ex=\d+x\d+$/i, "");
