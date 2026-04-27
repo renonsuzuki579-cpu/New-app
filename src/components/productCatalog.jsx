@@ -42,13 +42,46 @@ export const buildRakutenAffiliateUrl = (keyword) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
-// 🔁 楽天API取得＆キャッシュ
+// 🔁 楽天API取得＆キャッシュ＆リクエストキュー
 // ═══════════════════════════════════════════════════════════════
-// 同じキーワードで何度も叩かないようにするための単純キャッシュ。
-// Mapを使うので、同一ページ内の再レンダリングでは即時返る。
+// ・同じキーワードで何度も叩かないようにするキャッシュ
+// ・同時に複数のキーワードを叩くと楽天側で429エラーになるので、
+//   順番に並べて1つずつリクエストするキュー（最低 REQUEST_INTERVAL_MS ms 間隔）
 const productCache = new Map();
-// 進行中のfetchをキーごとに記録して、同時呼び出しを1本にまとめる
 const inFlight = new Map();
+
+// リクエスト間隔（楽天は1.5秒以上推奨）。1200msで控えめに。
+const REQUEST_INTERVAL_MS = 1200;
+
+// 直前のリクエスト終了時刻を保持してウェイトに使う
+let lastRequestEndedAt = 0;
+// 順番待ちキュー
+let queueChain = Promise.resolve();
+
+function enqueueRakutenRequest(keyword) {
+  // 「キューの最後尾に追加して、自分の番が来たら実行」する形
+  const myTurn = queueChain.then(async () => {
+    const wait = lastRequestEndedAt + REQUEST_INTERVAL_MS - Date.now();
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+
+    try {
+      const res = await fetch(
+        `/api/rakuten-products?keyword=${encodeURIComponent(keyword)}&hits=3`
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.items?.[0] || null;
+    } catch {
+      return null;
+    } finally {
+      lastRequestEndedAt = Date.now();
+    }
+  });
+
+  // チェーンを伸ばす（次の呼び出しは myTurn の後に実行される）
+  queueChain = myTurn.then(() => undefined, () => undefined);
+  return myTurn;
+}
 
 async function fetchRakutenItem(searchKeyword) {
   if (!searchKeyword) return null;
@@ -64,18 +97,9 @@ async function fetchRakutenItem(searchKeyword) {
 
   const promise = (async () => {
     try {
-      const res = await fetch(
-        `/api/rakuten-products?keyword=${encodeURIComponent(searchKeyword)}&hits=3`
-      );
-      if (!res.ok) throw new Error("api_error");
-      const data = await res.json();
-      const first = data?.items?.[0] || null;
-      productCache.set(searchKeyword, first);
-      return first;
-    } catch (err) {
-      // エラー時はnullをキャッシュしてフォールバックを誘発
-      productCache.set(searchKeyword, null);
-      return null;
+      const item = await enqueueRakutenRequest(searchKeyword);
+      productCache.set(searchKeyword, item);
+      return item;
     } finally {
       inFlight.delete(searchKeyword);
     }
