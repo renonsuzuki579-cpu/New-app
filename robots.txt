@@ -1,0 +1,11 @@
+# robots.txt
+# 検索エンジン(Google、Bingなど)のクローラーへの指示
+
+User-agent: *
+Allow: /
+
+# プライベートな領域はクロール禁止
+Disallow: /api/
+
+# サイトマップの場所を伝える
+Sitemap: https://new-app-rmmo.vercel.app/sitemap.xml
