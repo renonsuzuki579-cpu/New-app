@@ -811,6 +811,11 @@ export default function HyokaApp() {
   const [aiOnlyHistory, setAiOnlyHistory] = useState([]);
   const [inviteUrl, setInviteUrl] = useState("");
 
+  // 🆕 体型情報(任意入力、骨格判定の精度UP用)
+  const [bodyHeight, setBodyHeight] = useState("");
+  const [bodyShoulderHip, setBodyShoulderHip] = useState(null); // null | "shoulder" | "hip" | "same"
+  const [bodyClavicle, setBodyClavicle] = useState(null); // null | "visible" | "hidden"
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setInviteUrl(window.location.href);
@@ -858,7 +863,28 @@ export default function HyokaApp() {
     if (!uploadedImg) return;
     setAiLoading(true);
 
-    const prompt = DIAGNOSE_PROMPT;  
+    // 🆕 体型情報があればプロンプトに追加(骨格判定の精度UP)
+    let extraInfo = "";
+    if (bodyHeight || bodyShoulderHip || bodyClavicle) {
+      extraInfo = "\n\n═══════════════════════════════════\n■ ユーザーからの追加情報(骨格判定の参考に)\n═══════════════════════════════════\n";
+      if (bodyHeight) {
+        extraInfo += `身長: ${bodyHeight}cm\n`;
+      }
+      if (bodyShoulderHip === "shoulder") {
+        extraInfo += "肩幅と腰幅: 肩幅の方が広い感覚 → ストレート傾向\n";
+      } else if (bodyShoulderHip === "hip") {
+        extraInfo += "肩幅と腰幅: 腰幅の方が広い感覚 → ウェーブ傾向\n";
+      } else if (bodyShoulderHip === "same") {
+        extraInfo += "肩幅と腰幅: ほぼ同じ感覚 → ナチュラル傾向もあり\n";
+      }
+      if (bodyClavicle === "visible") {
+        extraInfo += "鎖骨: くっきり目立つ → ウェーブ傾向強\n";
+      } else if (bodyClavicle === "hidden") {
+        extraInfo += "鎖骨: あまり見えない → ストレート傾向\n";
+      }
+      extraInfo += "\nこの情報を骨格判定の重要な根拠として使ってください。確信が持てる場合はbone.confidenceを\"medium\"以上にしてもOKです。";
+    }
+    const prompt = DIAGNOSE_PROMPT + extraInfo;
 
     const match = uploadedImg.match(/^data:(image\/\w+);base64,(.+)$/);
     const mediaType = match ? match[1] : "image/jpeg";
@@ -939,6 +965,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
       analysis: analysisResult, time: new Date().toLocaleString("ja-JP"),
     }, ...h]);
     setUploadedImg(null); setAnalysisResult(null);
+    setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);  // 🆕 体型情報もリセット
     showToast("💾 履歴に保存しました");
     setMode("history");
   };
@@ -1038,6 +1065,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   if (window.confirm("この画像を削除しますか？")) {
                     setUploadedImg(null);
                     setAnalysisResult(null);
+                    setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
                     showToast("🗑 画像を削除しました");
                   }
                 }}
@@ -1063,11 +1091,120 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
           />
 
           {uploadedImg && !analysisResult && (
-            <GradBtn
-              grad={aiLoading?"rgba(255,255,255,0.08)":"linear-gradient(135deg,#8b5cf6,#ec4899,#f97316)"}
-              onClick={diagnoseWithAI} disabled={aiLoading}>
-              {aiLoading?"✨ パーツを細かく見ています...":"🤖 AI診断スタート"}
-            </GradBtn>
+            <>
+              {/* 🆕 体型情報フォーム(任意入力・骨格判定の精度UP) */}
+              <div style={{
+                padding:"14px 16px", borderRadius:14,
+                background:"rgba(255,255,255,0.04)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                marginBottom: 4,
+              }}>
+                <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
+                  <span style={{fontSize:14}}>💎</span>
+                  <span style={{fontSize:12, fontWeight:800, color:"rgba(255,255,255,0.85)"}}>
+                    さらに正確に診断するために(任意)
+                  </span>
+                </div>
+                <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6, marginBottom:14}}>
+                  骨格判定はもともと顔写真だけでは限界があります。下の項目を入れると判定がより正確になります。全部スキップしても診断はできます。
+                </div>
+
+                {/* 身長(任意) */}
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.65)", marginBottom:6}}>
+                    📏 身長(cm)
+                  </div>
+                  <input
+                    type="number"
+                    value={bodyHeight}
+                    onChange={(e) => setBodyHeight(e.target.value)}
+                    placeholder="例: 160"
+                    style={{
+                      width:"100%", padding:"10px 12px",
+                      borderRadius:10, border:"1px solid rgba(255,255,255,0.12)",
+                      background:"rgba(0,0,0,0.2)", color:"#fff",
+                      fontSize:13, fontWeight:600, outline:"none",
+                      boxSizing:"border-box",
+                    }}
+                  />
+                </div>
+
+                {/* 肩幅と腰幅 */}
+                <div style={{marginBottom:14}}>
+                  <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.65)", marginBottom:6}}>
+                    👤 肩幅と腰幅、どっちが広い感覚?
+                  </div>
+                  <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+                    {[
+                      {id:"shoulder", label:"肩幅"},
+                      {id:"hip", label:"腰幅"},
+                      {id:"same", label:"ほぼ同じ"},
+                    ].map(opt => {
+                      const active = bodyShoulderHip === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setBodyShoulderHip(active ? null : opt.id)}
+                          style={{
+                            flex:1, padding:"9px 6px", borderRadius:10,
+                            border:"none", cursor:"pointer",
+                            background: active
+                              ? "linear-gradient(135deg,#8b5cf6,#ec4899)"
+                              : "rgba(255,255,255,0.05)",
+                            color: active ? "#fff" : "rgba(255,255,255,0.55)",
+                            fontSize:12, fontWeight:800,
+                            transition:"all .15s",
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 鎖骨 */}
+                <div>
+                  <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.65)", marginBottom:6}}>
+                    🦴 鎖骨はくっきり目立ちますか?
+                  </div>
+                  <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
+                    {[
+                      {id:"visible", label:"くっきり目立つ"},
+                      {id:"hidden", label:"あまり見えない"},
+                    ].map(opt => {
+                      const active = bodyClavicle === opt.id;
+                      return (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setBodyClavicle(active ? null : opt.id)}
+                          style={{
+                            flex:1, padding:"9px 6px", borderRadius:10,
+                            border:"none", cursor:"pointer",
+                            background: active
+                              ? "linear-gradient(135deg,#8b5cf6,#ec4899)"
+                              : "rgba(255,255,255,0.05)",
+                            color: active ? "#fff" : "rgba(255,255,255,0.55)",
+                            fontSize:12, fontWeight:800,
+                            transition:"all .15s",
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <GradBtn
+                grad={aiLoading?"rgba(255,255,255,0.08)":"linear-gradient(135deg,#8b5cf6,#ec4899,#f97316)"}
+                onClick={diagnoseWithAI} disabled={aiLoading}>
+                {aiLoading?"✨ パーツを細かく見ています...":"🤖 AI診断スタート"}
+              </GradBtn>
+            </>
           )}
 
           {analysisResult && (
@@ -1092,7 +1229,11 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   <GradBtn grad="linear-gradient(135deg,#8b5cf6,#ec4899)" onClick={saveToHistory}>
                     💾 履歴に保存する
                   </GradBtn>
-                  <button onClick={()=>{setUploadedImg(null); setAnalysisResult(null);}} style={{
+                  <button onClick={()=>{
+                    setUploadedImg(null);
+                    setAnalysisResult(null);
+                    setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+                  }} style={{
                     background:"none",border:"none",color:"rgba(255,255,255,0.4)",
                     fontSize:13,fontWeight:600,cursor:"pointer",padding:"8px"}}>
                     🗑 この結果を捨ててやり直す
@@ -1402,7 +1543,10 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
 
       {isMainTab && (
         <BottomNav current={mode} onChange={(t)=>{
-          if (t !== mode) { setUploadedImg(null); setAnalysisResult(null); }
+          if (t !== mode) {
+            setUploadedImg(null); setAnalysisResult(null);
+            setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+          }
           setMode(t);
         }}/>
       )}
