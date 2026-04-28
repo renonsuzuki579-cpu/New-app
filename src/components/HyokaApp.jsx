@@ -1226,6 +1226,9 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   結果をどうしますか？
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {/* 🆕 シェアセクション */}
+                  <ShareSection analysis={analysisResult} showToast={showToast}/>
+
                   <GradBtn grad="linear-gradient(135deg,#8b5cf6,#ec4899)" onClick={saveToHistory}>
                     💾 履歴に保存する
                   </GradBtn>
@@ -1550,6 +1553,147 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
           setMode(t);
         }}/>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 📤 ShareSection
+//   診断結果をX/LINE/コピー/OS標準シェアで共有するためのセクション。
+//   テキストベースで実装(画像生成・URL発行は将来の拡張)。
+//
+//   各SNSでURLが「カード」として展開されるかは、サイト側の
+//   OGPメタタグ次第(別途設定が必要)。
+// ═══════════════════════════════════════════════════════════════
+function ShareSection({ analysis, showToast }) {
+  // シェアテキストを動的に組み立てる
+  const buildShareText = () => {
+    const eight = analysis?.eightType?.primary || "";
+    const bone = analysis?.bone?.primary || "";
+    const pc = analysis?.personalColor?.primary || "";
+    const url = typeof window !== "undefined" ? window.location.origin : "https://new-app-rmmo.vercel.app";
+
+    let text = "";
+    if (eight) text += `私の顔タイプは「${eight}」でした✨\n`;
+    if (bone) text += `🦴 骨格: ${bone}\n`;
+    if (pc) text += `🎨 カラー: ${pc}\n`;
+    text += `\nあなたも診断してみませんか?\n${url}\n\n#タイプ診断 #顔タイプ診断`;
+    return text;
+  };
+
+  const shareText = buildShareText();
+  const url = typeof window !== "undefined" ? window.location.origin : "https://new-app-rmmo.vercel.app";
+
+  // X(旧Twitter)で共有
+  const shareToX = () => {
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(intentUrl, "_blank", "noopener,noreferrer");
+  };
+
+  // LINEで共有
+  const shareToLine = () => {
+    const lineUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`;
+    window.open(lineUrl, "_blank", "noopener,noreferrer");
+  };
+
+  // クリップボードにコピー
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      showToast?.("📋 結果をコピーしました!");
+    } catch {
+      showToast?.("⚠️ コピーに失敗しました");
+    }
+  };
+
+  // OS標準シェア(対応端末のみ)
+  const [hasNativeShare, setHasNativeShare] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      setHasNativeShare(true);
+    }
+  }, []);
+  const nativeShare = async () => {
+    try {
+      await navigator.share({
+        title: "タイプ診断アプリ",
+        text: shareText,
+      });
+    } catch {
+      // ユーザーがキャンセルした場合は何もしない
+    }
+  };
+
+  // 各シェアボタンのスタイル(共通)
+  const baseBtnStyle = {
+    flex: 1, minWidth: 0,
+    padding: "10px 8px", borderRadius: 10,
+    border: "none", cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+    fontSize: 11, fontWeight: 800, color: "#fff",
+    transition: "all .15s",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+  };
+
+  return (
+    <div style={{
+      padding: "12px 14px", borderRadius: 12,
+      background: "linear-gradient(135deg,rgba(29,161,242,0.08),rgba(0,195,0,0.06))",
+      border: "1px solid rgba(255,255,255,0.1)",
+    }}>
+      <div style={{
+        fontSize: 11, fontWeight: 800,
+        color: "rgba(255,255,255,0.7)",
+        marginBottom: 10, textAlign: "center",
+      }}>
+        📤 結果をシェアする
+      </div>
+
+      <div style={{display: "flex", gap: 6, flexWrap: "wrap"}}>
+        {/* X */}
+        <button onClick={shareToX} style={{
+          ...baseBtnStyle,
+          background: "linear-gradient(135deg,#1d9bf0,#1a8cd8)",
+        }}>
+          <span style={{fontSize: 13, fontWeight: 900}}>𝕏</span>
+          <span>ポスト</span>
+        </button>
+
+        {/* LINE */}
+        <button onClick={shareToLine} style={{
+          ...baseBtnStyle,
+          background: "linear-gradient(135deg,#06c755,#00b900)",
+        }}>
+          <span>LINE</span>
+        </button>
+
+        {/* コピー */}
+        <button onClick={copyToClipboard} style={{
+          ...baseBtnStyle,
+          background: "linear-gradient(135deg,#6366f1,#818cf8)",
+        }}>
+          <span>📋</span>
+          <span>コピー</span>
+        </button>
+
+        {/* OS標準シェア(対応端末のみ) */}
+        {hasNativeShare && (
+          <button onClick={nativeShare} style={{
+            ...baseBtnStyle,
+            background: "linear-gradient(135deg,#f472b6,#c084fc)",
+          }}>
+            <span>📤</span>
+            <span>その他</span>
+          </button>
+        )}
+      </div>
+
+      <div style={{
+        fontSize: 9, color: "rgba(255,255,255,0.4)",
+        marginTop: 8, textAlign: "center", lineHeight: 1.5,
+      }}>
+        💡 結果テキスト + アプリのURLが共有されます(顔写真は共有されません)
+      </div>
     </div>
   );
 }
