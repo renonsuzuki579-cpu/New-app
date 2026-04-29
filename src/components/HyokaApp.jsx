@@ -1209,6 +1209,16 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
 
           {analysisResult && (
             <>
+              {/* 🆕 低信頼度時の警告(写真品質に問題がありそうな時に表示) */}
+              <LowConfidenceWarning
+                analysis={analysisResult}
+                onRetake={() => {
+                  setUploadedImg(null);
+                  setAnalysisResult(null);
+                  setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+                }}
+              />
+
               <AIAnalysisCard analysis={analysisResult}/>
 
              {/* 🌟 384通り対応・統合スタイルアドバイス（5タブ：全体/形/色/春/ヘア） */}
@@ -1553,6 +1563,108 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
           setMode(t);
         }}/>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ⚠️ LowConfidenceWarning
+//   AIが「自信がない」と判定した時に表示する警告ボックス。
+//
+//   表示条件:
+//   - eightType.confidence === "low" または
+//   - personalColor.confidence === "low"
+//   ※ bone は基本的に常に "low" なので除外(顔写真だけでの限界のため)
+//
+//   ユーザーが「再撮影」ボタンを押すと、画像と入力情報がクリアされる。
+// ═══════════════════════════════════════════════════════════════
+function LowConfidenceWarning({ analysis, onRetake }) {
+  if (!analysis) return null;
+
+  const eightLow = analysis.eightType?.confidence === "low";
+  const pcLow = analysis.personalColor?.confidence === "low";
+
+  // どちらも low でなければ警告を出さない
+  if (!eightLow && !pcLow) return null;
+
+  // どの判定が低信頼度かに応じてメッセージを調整
+  const targets = [];
+  if (eightLow) targets.push("顔タイプ");
+  if (pcLow) targets.push("パーソナルカラー");
+  const targetText = targets.join("・");
+
+  return (
+    <div style={{
+      padding: "14px 16px", borderRadius: 14,
+      background: "linear-gradient(135deg,rgba(251,191,36,0.12),rgba(244,114,182,0.06))",
+      border: "1px solid rgba(251,191,36,0.35)",
+    }}>
+      <div style={{
+        fontSize: 13, fontWeight: 800, color: "#fbbf24",
+        marginBottom: 8, display: "flex", alignItems: "center", gap: 6,
+      }}>
+        <span>⚠️</span>
+        <span>より正確に診断するには</span>
+      </div>
+
+      <div style={{
+        fontSize: 11, color: "rgba(255,255,255,0.78)",
+        lineHeight: 1.7, marginBottom: 12,
+      }}>
+        <span style={{color:"#fbbf24", fontWeight:700}}>{targetText}</span>
+        の判定が難しい写真でした。下のような写真で撮り直すと、より正確に診断できます。
+      </div>
+
+      <div style={{
+        padding: "10px 12px", borderRadius: 10,
+        background: "rgba(0,0,0,0.2)",
+        border: "1px solid rgba(255,255,255,0.06)",
+        marginBottom: 12,
+      }}>
+        <div style={{
+          fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.55)",
+          marginBottom: 6, letterSpacing: "0.3px",
+        }}>
+          📸 おすすめの撮影条件
+        </div>
+        <div style={{display: "flex", flexDirection: "column", gap: 4}}>
+          {[
+            "明るい自然光の場所(窓辺など)で撮影",
+            "正面を向いて顔がはっきり写る",
+            "前髪で顔が隠れすぎない",
+            ...(pcLow ? ["メイクは薄めにする(肌の色味を見るため)", "カラコンは外す(瞳の色を見るため)"] : []),
+            ...(eightLow ? ["顔全体が画面に収まる構図"] : []),
+          ].map((tip, i) => (
+            <div key={i} style={{
+              fontSize: 11, color: "rgba(255,255,255,0.8)",
+              lineHeight: 1.6, paddingLeft: 14, position: "relative",
+            }}>
+              <span style={{position: "absolute", left: 0, color: "#34d399", fontWeight: 800}}>✓</span>
+              {tip}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={onRetake}
+        style={{
+          width: "100%", padding: "11px 14px",
+          borderRadius: 10, border: "none", cursor: "pointer",
+          background: "linear-gradient(135deg,#fbbf24,#f472b6)",
+          color: "#fff", fontSize: 12, fontWeight: 800,
+          boxShadow: "0 2px 10px rgba(251,191,36,0.3)",
+        }}
+      >
+        📷 別の写真で診断し直す
+      </button>
+
+      <div style={{
+        fontSize: 9, color: "rgba(255,255,255,0.4)",
+        marginTop: 8, textAlign: "center", lineHeight: 1.5,
+      }}>
+        💡 もちろん今の結果のまま保存・シェアもできます
+      </div>
     </div>
   );
 }
