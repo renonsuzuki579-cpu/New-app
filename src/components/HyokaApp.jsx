@@ -538,7 +538,7 @@ const AIAnalysisCard = ({ analysis, defaultOpen=true }) => {
         <span style={{fontSize:12,fontWeight:800,
           background:"linear-gradient(135deg,#c084fc,#ec4899)",
           WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>
-          🤖 AI詳細診断 by Claude
+          🤖 AI詳細診断
         </span>
         <span style={{fontSize:11,color:"rgba(255,255,255,0.5)",fontWeight:700}}>
           {open?"▲ 閉じる":"▼ 詳細"}
