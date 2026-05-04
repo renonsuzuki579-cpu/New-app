@@ -11,7 +11,13 @@ import {
 } from "./styleGuideData";
 import { TermsContent, PrivacyContent } from "./legalContent";
 import { ProductShowcase } from "./productCatalog";
-import { DIAGNOSE_PROMPT } from "./diagnosePrompt";// 🆕 この行を追加
+import { DIAGNOSE_PROMPT } from "./diagnosePrompt";
+// 🆕 質問フォーム（骨格判定・PCヒント）
+import {
+  DiagnosisQuestionsForm,
+  calcBoneType,
+  buildExtraInfoForPrompt,
+} from "./diagnosisQuestions";
 
 // ═══════════════════════════════════════════════════════════════
 // 🔧 AI応答の正規化
@@ -103,22 +109,6 @@ const PC_TYPES = [
 // ═══════════════════════════════════════════════════════════════
 // 🛍 商品提案データ
 // ═══════════════════════════════════════════════════════════════
-// 思想：
-//   メインは「なぜ似合うのか」の論理的説明。
-//   商品リンクはあくまで参考（ユーザーが理解した上で見に行ける場所）。
-//
-// 構造：
-//   骨格3タイプ × カテゴリ3つ = 9パターンの「形」の提案
-//   パーソナルカラー4タイプ      = 4パターンの「色」のガイド
-//   この2つを組み合わせて、一人ひとりに合った提案を動的に作る。
-//
-// なぜこの分け方？
-//   服選びで一番大事なのは「形（骨格）」と「色（パーソナルカラー）」。
-//   8タイプ（フェミニン/クールなど）は印象づくりの軸であって、
-//   実際の購入判断には骨格と色の方が直接影響する。
-// ═══════════════════════════════════════════════════════════════
-
-// 骨格 × カテゴリ別の「形」の提案
 const BONE_RECOMMENDATIONS = {
   "ストレート": {
     "トップス": {
@@ -182,7 +172,7 @@ const BONE_RECOMMENDATIONS = {
       searchKeyword: "ワイドデニム レディース",
     },
     "アウター": {
-      itemName: "デニムジャケット（ロング） or ロングカーディガン",
+      itemName: "デニムジャケット(ロング) or ロングカーディガン",
       whyFits: "ナチュラルさんは「縦の長さ」が武器。ロングのデニムジャケットやざっくりロングカーデを羽織るだけで、スタイル良く見えてこなれた雰囲気が出ます。",
       avoid: "ジャストサイズのテーラードジャケット、きっちりしすぎたコート。ナチュラルのラフさと合わず堅苦しく見えます。",
       checklist: ["素材: デニム、ざっくりニット、リネン", "形: ロング、ゆるめのライン", "丈: ヒップ下〜膝下", "避けたい: ジャストサイズのテーラード"],
@@ -224,7 +214,6 @@ const PC_COLOR_GUIDE = {
 };
 
 // 楽天市場の検索URLを作る
-// アフィリエイトIDを使用してアフィリエイトリンクとして発行する
 const RAKUTEN_AFFILIATE_ID = "532f53ca.02addeb3.532f53cb.ef93f387";
 const buildRakutenSearchUrl = (keyword) => {
   const encoded = encodeURIComponent(keyword);
@@ -235,9 +224,8 @@ const buildRakutenSearchUrl = (keyword) => {
   return baseUrl;
 };
 
-// 今の月から季節を判定する
 const getCurrentSeason = () => {
-  const month = new Date().getMonth() + 1; // 1-12
+  const month = new Date().getMonth() + 1;
   if (month >= 3 && month <= 5) return "春";
   if (month >= 6 && month <= 8) return "夏";
   if (month >= 9 && month <= 11) return "秋";
@@ -247,13 +235,6 @@ const getCurrentSeason = () => {
 // ═══════════════════════════════════════════════════════════════
 // 🌸 2026年春の組み合わせデータ
 // ═══════════════════════════════════════════════════════════════
-// 思想：
-//   既存の商品提案は「定番の理論」で年中使える内容。
-//   こちらは「今年・今シーズン」のリアルなコーデ感を補強する。
-//   骨格別の具体的なコーデ例 + 旬のトレンド + 4軸調整のコツ。
-// ═══════════════════════════════════════════════════════════════
-
-// 骨格別の春コーデ例（4パターンずつ）
 const SPRING_OUTFITS_2026 = {
   "ストレート": [
     "白のきれいめシャツ × ストレートデニム × ローファー",
@@ -275,8 +256,6 @@ const SPRING_OUTFITS_2026 = {
   ],
 };
 
-// 骨格別の夏コーデ例（基本パターン4つずつ）
-// ※ トレンド情報は省略。夏のリアルなトレンド資料が来たら、SPRING相当に拡張する
 const SUMMER_OUTFITS_BASIC = {
   "ストレート": [
     "シンプルな半袖カットソー × ストレートデニム × サンダル",
@@ -298,7 +277,6 @@ const SUMMER_OUTFITS_BASIC = {
   ],
 };
 
-// 骨格別の秋コーデ例（基本パターン4つずつ）
 const AUTUMN_OUTFITS_BASIC = {
   "ストレート": [
     "白シャツ × タイトスカート × ローファー",
@@ -320,7 +298,6 @@ const AUTUMN_OUTFITS_BASIC = {
   ],
 };
 
-// 骨格別の冬コーデ例（基本パターン4つずつ）
 const WINTER_OUTFITS_BASIC = {
   "ストレート": [
     "チェスターコート × きれいめニット × ストレートパンツ",
@@ -342,7 +319,6 @@ const WINTER_OUTFITS_BASIC = {
   ],
 };
 
-// 季節 → コーデデータのマップ（季節判定で出し分けるための索引）
 const SEASONAL_OUTFITS = {
   "春": SPRING_OUTFITS_2026,
   "夏": SUMMER_OUTFITS_BASIC,
@@ -350,7 +326,6 @@ const SEASONAL_OUTFITS = {
   "冬": WINTER_OUTFITS_BASIC,
 };
 
-// 2026年春の旬トレンド（全骨格共通）
 const SPRING_TRENDS_2026 = {
   description: "2026年春のキーワードは「軽やかさ」「華やぎ」「甘辛ミックス」。少し大人っぽく見える組み方が今っぽいです。",
   keyItems: ["ボウタイブラウス", "3Dフラワー", "セットアップ", "スカーフ", "ライトブルーデニム", "セーラー衿"],
@@ -364,7 +339,6 @@ const SPRING_TRENDS_2026 = {
   ],
 };
 
-// 「似合わない服」を着たいときの4軸調整理論
 const FOUR_AXIS_TIPS = [
   {
     axis: "丈",
@@ -490,7 +464,6 @@ const Glass = ({ children, style={} }) => (
   </div>
 );
 
-// 履歴画面のタイプ絞り込みチップでだけ使用
 const FilterChip = ({ label, active, onClick, grad }) => (
   <button onClick={onClick} style={{
     padding:"7px 14px", borderRadius:99, border:"none", cursor:"pointer",
@@ -801,7 +774,7 @@ const AIAnalysisCard = ({ analysis, defaultOpen=true }) => {
 // Main App
 // ═══════════════════════════════════════════════════════════════
 export default function HyokaApp() {
-  // mode: "home" | "history" | "mypage" | "invite"
+  // mode: "home" | "history" | "mypage" | "invite" | "terms" | "privacy"
   const [mode, setMode] = useState("home");
   const [uploadedImg, setUploadedImg] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -811,10 +784,10 @@ export default function HyokaApp() {
   const [aiOnlyHistory, setAiOnlyHistory] = useState([]);
   const [inviteUrl, setInviteUrl] = useState("");
 
-  // 🆕 体型情報(任意入力、骨格判定の精度UP用)
+  // 🆕 質問フォームの回答
   const [bodyHeight, setBodyHeight] = useState("");
-  const [bodyShoulderHip, setBodyShoulderHip] = useState(null); // null | "shoulder" | "hip" | "same"
-  const [bodyClavicle, setBodyClavicle] = useState(null); // null | "visible" | "hidden"
+  const [boneAnswers, setBoneAnswers] = useState({});  // 骨格7問の回答
+  const [pcAnswers, setPcAnswers] = useState({});       // PC3問の回答
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -823,6 +796,13 @@ export default function HyokaApp() {
   }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2400); };
+
+  // 質問フォームの回答もまとめてリセットするヘルパー
+  const resetQuestionAnswers = () => {
+    setBodyHeight("");
+    setBoneAnswers({});
+    setPcAnswers({});
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -863,28 +843,27 @@ export default function HyokaApp() {
     if (!uploadedImg) return;
     setAiLoading(true);
 
-    // 🆕 体型情報があればプロンプトに追加(骨格判定の精度UP)
-    let extraInfo = "";
-    if (bodyHeight || bodyShoulderHip || bodyClavicle) {
-      extraInfo = "\n\n═══════════════════════════════════\n■ ユーザーからの追加情報(骨格判定の参考に)\n═══════════════════════════════════\n";
-      if (bodyHeight) {
-        extraInfo += `身長: ${bodyHeight}cm\n`;
-      }
-      if (bodyShoulderHip === "shoulder") {
-        extraInfo += "肩幅と腰幅: 肩幅の方が広い感覚 → ストレート傾向\n";
-      } else if (bodyShoulderHip === "hip") {
-        extraInfo += "肩幅と腰幅: 腰幅の方が広い感覚 → ウェーブ傾向\n";
-      } else if (bodyShoulderHip === "same") {
-        extraInfo += "肩幅と腰幅: ほぼ同じ感覚 → ナチュラル傾向もあり\n";
-      }
-      if (bodyClavicle === "visible") {
-        extraInfo += "鎖骨: くっきり目立つ → ウェーブ傾向強\n";
-      } else if (bodyClavicle === "hidden") {
-        extraInfo += "鎖骨: あまり見えない → ストレート傾向\n";
-      }
-      extraInfo += "\nこの情報を骨格判定の重要な根拠として使ってください。確信が持てる場合はbone.confidenceを\"medium\"以上にしてもOKです。";
-    }
+    // 🆕 質問の回答からプロンプト追加情報を生成
+    const extraInfo = buildExtraInfoForPrompt({ bodyHeight, boneAnswers, pcAnswers });
     const prompt = DIAGNOSE_PROMPT + extraInfo;
+
+    // 🆕 ユーザー回答による骨格判定（信頼度 high/medium ならAI結果を上書き）
+    const boneResult = calcBoneType(boneAnswers);
+    const applyBoneOverride = (analysis) => {
+      if (!boneResult) return analysis;
+      if (boneResult.confidence !== "high" && boneResult.confidence !== "medium") {
+        return analysis;
+      }
+      return {
+        ...analysis,
+        bone: {
+          primary: boneResult.primary,
+          breakdown: boneResult.breakdown,
+          confidence: boneResult.confidence,
+          note: `あなたの回答（${boneResult.answered}問）から判定しました。顔写真からの推測ではなく、ご自身の体の特徴に基づくため信頼度が高い結果です。`,
+        },
+      };
+    };
 
     const match = uploadedImg.match(/^data:(image\/\w+);base64,(.+)$/);
     const mediaType = match ? match[1] : "image/jpeg";
@@ -900,7 +879,7 @@ export default function HyokaApp() {
       if (res.ok) {
         const data = await res.json();
         if (data?.result) {
-          setAnalysisResult(normalizeAnalysis(data.result));
+          setAnalysisResult(applyBoneOverride(normalizeAnalysis(data.result)));
           if (data.demo) showToast("🎨 デモモードで診断しました");
           setAiLoading(false);
           return;
@@ -936,7 +915,7 @@ export default function HyokaApp() {
         const text = data.content?.[0]?.text?.trim() || "{}";
         const cleaned = text.replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(cleaned);
-        setAnalysisResult(normalizeAnalysis(parsed));
+        setAnalysisResult(applyBoneOverride(normalizeAnalysis(parsed)));
         setAiLoading(false);
         return;
       }
@@ -953,7 +932,8 @@ export default function HyokaApp() {
       randomPick(BONE_TYPES).label,
       randomPick(PC_TYPES).label,
     );
-setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモード：サンプル結果を表示しています");
+    setAnalysisResult(applyBoneOverride(normalizeAnalysis(demoResult)));
+    showToast("🎨 デモモード：サンプル結果を表示しています");
     setAiLoading(false);
   };
 
@@ -965,7 +945,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
       analysis: analysisResult, time: new Date().toLocaleString("ja-JP"),
     }, ...h]);
     setUploadedImg(null); setAnalysisResult(null);
-    setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);  // 🆕 体型情報もリセット
+    resetQuestionAnswers();  // 🆕 質問の回答もリセット
     showToast("💾 履歴に保存しました");
     setMode("history");
   };
@@ -1055,7 +1035,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   </div>
               }
             </div>
-            {/* 🆕 アップロード済み画像を削除する×ボタン */}
+            {/* アップロード済み画像を削除する×ボタン */}
             {uploadedImg && (
               <button
                 type="button"
@@ -1065,7 +1045,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   if (window.confirm("この画像を削除しますか？")) {
                     setUploadedImg(null);
                     setAnalysisResult(null);
-                    setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+                    resetQuestionAnswers();
                     showToast("🗑 画像を削除しました");
                   }
                 }}
@@ -1092,112 +1072,12 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
 
           {uploadedImg && !analysisResult && (
             <>
-              {/* 🆕 体型情報フォーム(任意入力・骨格判定の精度UP) */}
-              <div style={{
-                padding:"14px 16px", borderRadius:14,
-                background:"rgba(255,255,255,0.04)",
-                border:"1px solid rgba(255,255,255,0.08)",
-                marginBottom: 4,
-              }}>
-                <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
-                  <span style={{fontSize:14}}>💎</span>
-                  <span style={{fontSize:12, fontWeight:800, color:"rgba(255,255,255,0.85)"}}>
-                    さらに正確に診断するために(任意)
-                  </span>
-                </div>
-                <div style={{fontSize:10, color:"rgba(255,255,255,0.45)", lineHeight:1.6, marginBottom:14}}>
-                  骨格判定はもともと顔写真だけでは限界があります。下の項目を入れると判定がより正確になります。全部スキップしても診断はできます。
-                </div>
-
-                {/* 身長(任意) */}
-                <div style={{marginBottom:14}}>
-                  <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.65)", marginBottom:6}}>
-                    📏 身長(cm)
-                  </div>
-                  <input
-                    type="number"
-                    value={bodyHeight}
-                    onChange={(e) => setBodyHeight(e.target.value)}
-                    placeholder="例: 160"
-                    style={{
-                      width:"100%", padding:"10px 12px",
-                      borderRadius:10, border:"1px solid rgba(255,255,255,0.12)",
-                      background:"rgba(0,0,0,0.2)", color:"#fff",
-                      fontSize:13, fontWeight:600, outline:"none",
-                      boxSizing:"border-box",
-                    }}
-                  />
-                </div>
-
-                {/* 肩幅と腰幅 */}
-                <div style={{marginBottom:14}}>
-                  <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.65)", marginBottom:6}}>
-                    👤 肩幅と腰幅、どっちが広い感覚?
-                  </div>
-                  <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
-                    {[
-                      {id:"shoulder", label:"肩幅"},
-                      {id:"hip", label:"腰幅"},
-                      {id:"same", label:"ほぼ同じ"},
-                    ].map(opt => {
-                      const active = bodyShoulderHip === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setBodyShoulderHip(active ? null : opt.id)}
-                          style={{
-                            flex:1, padding:"9px 6px", borderRadius:10,
-                            border:"none", cursor:"pointer",
-                            background: active
-                              ? "linear-gradient(135deg,#8b5cf6,#ec4899)"
-                              : "rgba(255,255,255,0.05)",
-                            color: active ? "#fff" : "rgba(255,255,255,0.55)",
-                            fontSize:12, fontWeight:800,
-                            transition:"all .15s",
-                          }}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 鎖骨 */}
-                <div>
-                  <div style={{fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.65)", marginBottom:6}}>
-                    🦴 鎖骨はくっきり目立ちますか?
-                  </div>
-                  <div style={{display:"flex", gap:6, flexWrap:"wrap"}}>
-                    {[
-                      {id:"visible", label:"くっきり目立つ"},
-                      {id:"hidden", label:"あまり見えない"},
-                    ].map(opt => {
-                      const active = bodyClavicle === opt.id;
-                      return (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setBodyClavicle(active ? null : opt.id)}
-                          style={{
-                            flex:1, padding:"9px 6px", borderRadius:10,
-                            border:"none", cursor:"pointer",
-                            background: active
-                              ? "linear-gradient(135deg,#8b5cf6,#ec4899)"
-                              : "rgba(255,255,255,0.05)",
-                            color: active ? "#fff" : "rgba(255,255,255,0.55)",
-                            fontSize:12, fontWeight:800,
-                            transition:"all .15s",
-                          }}
-                        >
-                          {opt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              {/* 🆕 質問フォーム（身長・骨格7問・PC3問） */}
+              <DiagnosisQuestionsForm
+                bodyHeight={bodyHeight} setBodyHeight={setBodyHeight}
+                boneAnswers={boneAnswers} setBoneAnswers={setBoneAnswers}
+                pcAnswers={pcAnswers} setPcAnswers={setPcAnswers}
+              />
 
               <GradBtn
                 grad={aiLoading?"rgba(255,255,255,0.08)":"linear-gradient(135deg,#8b5cf6,#ec4899,#f97316)"}
@@ -1209,25 +1089,25 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
 
           {analysisResult && (
             <>
-              {/* 🆕 低信頼度時の警告(写真品質に問題がありそうな時に表示) */}
+              {/* 低信頼度時の警告 */}
               <LowConfidenceWarning
                 analysis={analysisResult}
                 onRetake={() => {
                   setUploadedImg(null);
                   setAnalysisResult(null);
-                  setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+                  resetQuestionAnswers();
                 }}
               />
 
               <AIAnalysisCard analysis={analysisResult}/>
 
-             {/* 🌟 384通り対応・統合スタイルアドバイス（5タブ：全体/形/色/春/ヘア） */}
+              {/* 384通り対応・統合スタイルアドバイス */}
               <StyleAdviceHub analysis={analysisResult}/>
 
-              {/* 🛍 買い物ガイド（楽天検索リンク付きの購入提案） */}
+              {/* 買い物ガイド */}
               <BuyGuideCard analysis={analysisResult}/>
 
-              {/* 🆕 ✨ 商品提案セクション（季節×骨格別の具体商品カード） */}
+              {/* 商品提案セクション */}
               <ProductShowcase analysis={analysisResult}/>
 
               <div style={{padding:"14px",borderRadius:16,
@@ -1236,7 +1116,6 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   結果をどうしますか？
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                  {/* 🆕 シェアセクション */}
                   <ShareSection analysis={analysisResult} showToast={showToast}/>
 
                   <GradBtn grad="linear-gradient(135deg,#8b5cf6,#ec4899)" onClick={saveToHistory}>
@@ -1245,7 +1124,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   <button onClick={()=>{
                     setUploadedImg(null);
                     setAnalysisResult(null);
-                    setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+                    resetQuestionAnswers();
                   }} style={{
                     background:"none",border:"none",color:"rgba(255,255,255,0.4)",
                     fontSize:13,fontWeight:600,cursor:"pointer",padding:"8px"}}>
@@ -1342,11 +1221,9 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
                   </div>
                   <AIAnalysisCard analysis={item.analysis} defaultOpen={false}/>
 
-                  {/* 履歴画面でも統合スタイルガイド＋買い物ガイドを表示 */}
                   <div style={{marginTop:12, display:"flex", flexDirection:"column", gap:12}}>
                     <StyleAdviceHub analysis={item.analysis}/>
                     <BuyGuideCard analysis={item.analysis}/>
-                    {/* 🆕 商品提案セクション */}
                     <ProductShowcase analysis={item.analysis}/>
                   </div>
                 </Glass>
@@ -1392,7 +1269,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
             </GradBtn>
           </div>
 
-          {/* 🆕 法的書類セクション */}
+          {/* 法的書類セクション */}
           <div style={{marginTop:20}}>
             <div style={{fontSize:10, color:"rgba(255,255,255,0.35)", marginBottom:10, fontWeight:700, paddingLeft:4}}>
               📋 サービスについて
@@ -1423,7 +1300,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
             </div>
           </div>
 
-          {/* 🆕 データ管理セクション（プライバシー強化） */}
+          {/* データ管理セクション */}
           <div style={{marginTop:20}}>
             <div style={{fontSize:10, color:"rgba(255,255,255,0.35)", marginBottom:10, fontWeight:700, paddingLeft:4}}>
               ⚠️ データ管理
@@ -1466,13 +1343,9 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
               </button>
             </div>
           </div>
-
-          {/* TODO: 今後ここに追加予定のメニュー
-              - AIキー設定（本物のAI診断を使うため）
-              - お気に入り商品（アフィリエイト実装後）
-          */}
         </div>
       )}
+
       {/* INVITE */}
       {mode==="invite" && (
         <div style={{position:"relative",zIndex:1,padding:"36px 24px 60px",display:"flex",flexDirection:"column",gap:20}}>
@@ -1544,12 +1417,12 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
         </div>
       )}
 
-      {/* 🆕 TERMS — 利用規約 */}
+      {/* TERMS — 利用規約 */}
       {mode==="terms" && (
         <TermsContent BackBtn={BackBtn} onBack={()=>setMode("mypage")} />
       )}
 
-      {/* 🆕 PRIVACY — プライバシーポリシー */}
+      {/* PRIVACY — プライバシーポリシー */}
       {mode==="privacy" && (
         <PrivacyContent BackBtn={BackBtn} onBack={()=>setMode("mypage")} />
       )}
@@ -1558,7 +1431,7 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
         <BottomNav current={mode} onChange={(t)=>{
           if (t !== mode) {
             setUploadedImg(null); setAnalysisResult(null);
-            setBodyHeight(""); setBodyShoulderHip(null); setBodyClavicle(null);
+            resetQuestionAnswers();
           }
           setMode(t);
         }}/>
@@ -1569,14 +1442,6 @@ setAnalysisResult(normalizeAnalysis(demoResult));    showToast("🎨 デモモ�
 
 // ═══════════════════════════════════════════════════════════════
 // ⚠️ LowConfidenceWarning
-//   AIが「自信がない」と判定した時に表示する警告ボックス。
-//
-//   表示条件:
-//   - eightType.confidence === "low" または
-//   - personalColor.confidence === "low"
-//   ※ bone は基本的に常に "low" なので除外(顔写真だけでの限界のため)
-//
-//   ユーザーが「再撮影」ボタンを押すと、画像と入力情報がクリアされる。
 // ═══════════════════════════════════════════════════════════════
 function LowConfidenceWarning({ analysis, onRetake }) {
   if (!analysis) return null;
@@ -1584,10 +1449,8 @@ function LowConfidenceWarning({ analysis, onRetake }) {
   const eightLow = analysis.eightType?.confidence === "low";
   const pcLow = analysis.personalColor?.confidence === "low";
 
-  // どちらも low でなければ警告を出さない
   if (!eightLow && !pcLow) return null;
 
-  // どの判定が低信頼度かに応じてメッセージを調整
   const targets = [];
   if (eightLow) targets.push("顔タイプ");
   if (pcLow) targets.push("パーソナルカラー");
@@ -1671,14 +1534,8 @@ function LowConfidenceWarning({ analysis, onRetake }) {
 
 // ═══════════════════════════════════════════════════════════════
 // 📤 ShareSection
-//   診断結果をX/LINE/コピー/OS標準シェアで共有するためのセクション。
-//   テキストベースで実装(画像生成・URL発行は将来の拡張)。
-//
-//   各SNSでURLが「カード」として展開されるかは、サイト側の
-//   OGPメタタグ次第(別途設定が必要)。
 // ═══════════════════════════════════════════════════════════════
 function ShareSection({ analysis, showToast }) {
-  // シェアテキストを動的に組み立てる
   const buildShareText = () => {
     const eight = analysis?.eightType?.primary || "";
     const bone = analysis?.bone?.primary || "";
@@ -1696,19 +1553,16 @@ function ShareSection({ analysis, showToast }) {
   const shareText = buildShareText();
   const url = typeof window !== "undefined" ? window.location.origin : "https://new-app-rmmo.vercel.app";
 
-  // X(旧Twitter)で共有
   const shareToX = () => {
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
     window.open(intentUrl, "_blank", "noopener,noreferrer");
   };
 
-  // LINEで共有
   const shareToLine = () => {
     const lineUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`;
     window.open(lineUrl, "_blank", "noopener,noreferrer");
   };
 
-  // クリップボードにコピー
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(shareText);
@@ -1718,7 +1572,6 @@ function ShareSection({ analysis, showToast }) {
     }
   };
 
-  // OS標準シェア(対応端末のみ)
   const [hasNativeShare, setHasNativeShare] = useState(false);
   useEffect(() => {
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
@@ -1732,11 +1585,10 @@ function ShareSection({ analysis, showToast }) {
         text: shareText,
       });
     } catch {
-      // ユーザーがキャンセルした場合は何もしない
+      // ユーザーキャンセル
     }
   };
 
-  // 各シェアボタンのスタイル(共通)
   const baseBtnStyle = {
     flex: 1, minWidth: 0,
     padding: "10px 8px", borderRadius: 10,
@@ -1762,7 +1614,6 @@ function ShareSection({ analysis, showToast }) {
       </div>
 
       <div style={{display: "flex", gap: 6, flexWrap: "wrap"}}>
-        {/* X */}
         <button onClick={shareToX} style={{
           ...baseBtnStyle,
           background: "linear-gradient(135deg,#1d9bf0,#1a8cd8)",
@@ -1771,7 +1622,6 @@ function ShareSection({ analysis, showToast }) {
           <span>ポスト</span>
         </button>
 
-        {/* LINE */}
         <button onClick={shareToLine} style={{
           ...baseBtnStyle,
           background: "linear-gradient(135deg,#06c755,#00b900)",
@@ -1779,7 +1629,6 @@ function ShareSection({ analysis, showToast }) {
           <span>LINE</span>
         </button>
 
-        {/* コピー */}
         <button onClick={copyToClipboard} style={{
           ...baseBtnStyle,
           background: "linear-gradient(135deg,#6366f1,#818cf8)",
@@ -1788,7 +1637,6 @@ function ShareSection({ analysis, showToast }) {
           <span>コピー</span>
         </button>
 
-        {/* OS標準シェア(対応端末のみ) */}
         {hasNativeShare && (
           <button onClick={nativeShare} style={{
             ...baseBtnStyle,
@@ -1812,12 +1660,9 @@ function ShareSection({ analysis, showToast }) {
 
 // ═══════════════════════════════════════════════════════════════
 // 🛍 BuyGuideCard
-//   元の ProductRecommendationSection を「買い物特化」にスリム化したもの。
-//   「色ガイド」と「春トレンド」は新しい StyleAdviceHub（色タブ・春タブ）
-//   側に役割分担で移しているので、ここでは買う場所への動線に集中する。
 // ═══════════════════════════════════════════════════════════════
 function BuyGuideCard({ analysis }) {
-  const [open, setOpen] = useState(true); // 🆕 折り畳み用 state（早期 return より前に置く）
+  const [open, setOpen] = useState(true);
 
   const boneType = analysis?.bone?.primary;
   const pcType = analysis?.personalColor?.primary;
@@ -1833,7 +1678,6 @@ function BuyGuideCard({ analysis }) {
       background:"linear-gradient(145deg,rgba(251,191,36,0.08),rgba(244,114,182,0.05))",
       border:"1px solid rgba(251,191,36,0.25)"}}>
 
-      {/* ヘッダー（クリックで開閉） */}
       <div onClick={()=>setOpen(o=>!o)}
         style={{padding:"14px 16px", cursor:"pointer",
           background:"linear-gradient(135deg,rgba(251,191,36,0.2),rgba(244,114,182,0.15))",
@@ -1859,7 +1703,6 @@ function BuyGuideCard({ analysis }) {
       {open && (
         <div style={{padding:"16px"}}>
           {categories.map((category, idx) => {
-            // ...（ここから下は元のまま）
           const rec = boneRecs[category];
           if (!rec) return null;
           const searchKeyword = `${rec.searchKeyword} ${season}`;
@@ -1867,7 +1710,6 @@ function BuyGuideCard({ analysis }) {
 
           return (
             <div key={category} style={{marginTop: idx === 0 ? 0 : 18}}>
-              {/* カテゴリ見出し */}
               <div style={{display:"flex", alignItems:"center", gap:8, marginBottom:10}}>
                 <div style={{width:4, height:18, borderRadius:2,
                   background:"linear-gradient(180deg,#fbbf24,#f472b6)"}}/>
@@ -1876,7 +1718,6 @@ function BuyGuideCard({ analysis }) {
                 </div>
               </div>
 
-              {/* なぜ似合うのか */}
               <div style={{padding:"12px 14px", borderRadius:12,
                 background:"rgba(251,191,36,0.06)",
                 border:"1px solid rgba(251,191,36,0.2)", marginBottom:8}}>
@@ -1888,7 +1729,6 @@ function BuyGuideCard({ analysis }) {
                 </div>
               </div>
 
-              {/* 避けたいもの */}
               <div style={{padding:"12px 14px", borderRadius:12,
                 background:"rgba(244,63,94,0.06)",
                 border:"1px solid rgba(244,63,94,0.2)", marginBottom:8}}>
@@ -1900,7 +1740,6 @@ function BuyGuideCard({ analysis }) {
                 </div>
               </div>
 
-              {/* チェックリスト */}
               <div style={{padding:"12px 14px", borderRadius:12,
                 background:"rgba(139,92,246,0.06)",
                 border:"1px solid rgba(139,92,246,0.2)", marginBottom:8}}>
@@ -1918,7 +1757,6 @@ function BuyGuideCard({ analysis }) {
                 </div>
               </div>
 
-              {/* 楽天検索リンク */}
               <a href={searchUrl} target="_blank" rel="noopener noreferrer"
                 style={{textDecoration:"none", display:"block"}}>
                 <div style={{padding:"11px 14px", borderRadius:12,
@@ -1943,33 +1781,25 @@ function BuyGuideCard({ analysis }) {
           </div>
         </div>
       </div>
-       )}  
+       )}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════
 // 🌟 StyleAdviceHub
-//   384通り（8タイプ × 3骨格 × 16PC）対応の統合スタイルアドバイス。
-//   5タブ：全体／形／色／春／ヘア
-//   styleGuideData.js から深いガイダンスを引いてきて表示する。
-//
-//   16PCはデフォルトで4PCの「典型サブタイプ」に固定し、
-//   色タブでユーザーが4つから選び直せるようにしてある。
 // ═══════════════════════════════════════════════════════════════
 function StyleAdviceHub({ analysis }) {
   const faceType = analysis?.eightType?.primary;
   const boneType = analysis?.bone?.primary;
   const pc4 = analysis?.personalColor?.primary;
 
-  // 16PC：4PCから「典型」サブタイプを初期値に。色タブで変更可。
   const [pc16, setPc16] = useState(() =>
     pc4 ? DEFAULT_PC4_REPRESENTATIVE[pc4] : null
   );
   const [activeTab, setActiveTab] = useState("overall");
   const [hubOpen, setHubOpen] = useState(true);
 
-  // 必要なデータが揃ってないと表示しない
   if (!faceType || !boneType || !pc4) return null;
   const faceData = FACE_TYPE_GUIDE[faceType];
   const boneData = BONE_TYPE_GUIDE[boneType];
@@ -1978,7 +1808,6 @@ function StyleAdviceHub({ analysis }) {
 
   const pc16Options = PC4_TO_PC16[pc4] || [];
 
-  // この組み合わせに当てはまる衝突パターン
   const applicableConflicts = useMemo(() =>
     CONFLICT_RULES.examples.filter(c =>
       c.pattern.includes(faceType) ||
@@ -1987,7 +1816,6 @@ function StyleAdviceHub({ analysis }) {
     ), [faceType, boneType, pc16]
   );
 
-  // この組み合わせに似合うトレンド／注意のトレンド
   const goodTrends = useMemo(() =>
     SPRING_2026_TREND_FIT.trendItems.filter(t =>
       t.goodFor?.faceType?.includes(faceType) ||
@@ -2016,7 +1844,6 @@ function StyleAdviceHub({ analysis }) {
       background:"linear-gradient(145deg,rgba(168,85,247,0.1),rgba(20,184,166,0.06))",
       border:"1px solid rgba(168,85,247,0.25)"}}>
 
-      {/* ヘッダー（クリックで開閉） */}
       <div onClick={()=>setHubOpen(o=>!o)}
         style={{padding:"14px 16px", cursor:"pointer",
           background:"linear-gradient(135deg,rgba(168,85,247,0.22),rgba(20,184,166,0.15))",
@@ -2039,7 +1866,6 @@ function StyleAdviceHub({ analysis }) {
 
       {hubOpen && (
         <>
-          {/* タブバー */}
           <div style={{padding:"10px 12px 4px",
             display:"flex", gap:4,
             background:"rgba(0,0,0,0.18)",
@@ -2063,7 +1889,6 @@ function StyleAdviceHub({ analysis }) {
             })}
           </div>
 
-          {/* タブ中身 */}
           <div style={{padding:"14px 16px"}}>
             {activeTab === "overall" && (
               <OverallTabContent
@@ -2094,7 +1919,7 @@ function StyleAdviceHub({ analysis }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// 共通：チップ風ピル（ハブ内のリスト表示で使い回す）
+// 共通：チップ風ピル
 // ─────────────────────────────────────────────────────────────────
 const Pill = ({ children, color="rgba(255,255,255,0.18)", border="rgba(255,255,255,0.25)", text="#fff" }) => (
   <span style={{padding:"4px 11px", borderRadius:20, fontSize:11, fontWeight:700,
@@ -2110,14 +1935,13 @@ const SectionHead = ({ icon, label, color="rgba(255,255,255,0.55)" }) => (
 );
 
 // ─────────────────────────────────────────────────────────────────
-// タブ1: 💫 全体（系統・印象・組み合わせ衝突）
+// タブ1: 💫 全体
 // ─────────────────────────────────────────────────────────────────
 function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts }) {
   const eightTypeData = EIGHT_TYPES.find(e => e.label === faceType);
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
-      {/* メインバナー */}
       <div style={{padding:"14px", borderRadius:14,
         background: eightTypeData?.grad || "linear-gradient(135deg,#a855f7,#ec4899)",
         color:"#fff"}}>
@@ -2130,7 +1954,6 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
         </div>
       </div>
 
-      {/* 印象ワード */}
       <div>
         <SectionHead icon="💭" label="あなたが与える印象"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2142,7 +1965,6 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
         </div>
       </div>
 
-      {/* 似合うファッション系統 */}
       <div>
         <SectionHead icon="👗" label="似合うファッション系統"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2154,7 +1976,6 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
         </div>
       </div>
 
-      {/* 春の鉄板アイテム */}
       <div>
         <SectionHead icon="✨" label="春の鉄板アイテム"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2166,7 +1987,6 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
         </div>
       </div>
 
-      {/* 避けたいスタイル */}
       <div>
         <SectionHead icon="⚠️" label="避けたいスタイル"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2178,7 +1998,6 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
         </div>
       </div>
 
-      {/* 衝突パターン（軸が合わないときの解決法） */}
       {conflicts.length > 0 && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(251,191,36,0.08)",
@@ -2187,14 +2006,12 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
             🤔 組み合わせで迷ったら
           </div>
 
-          {/* 何が起きてるかの説明（やさしい言葉で） */}
           <div style={{fontSize:11, color:"rgba(255,255,255,0.75)", marginBottom:10, lineHeight:1.7}}>
             顔タイプ・骨格・PCはそれぞれ別の軸を見ているので、組み合わせによっては
             <span style={{color:"#fbbf24", fontWeight:700}}>「どっちに合わせればいいの？」</span>
             と迷うことがあります。
           </div>
 
-          {/* 基本ルール（迷ったときの判断基準） */}
           <div style={{padding:"10px 12px", borderRadius:10,
             background:"rgba(0,0,0,0.22)", marginBottom:10,
             border:"1px solid rgba(251,191,36,0.18)"}}>
@@ -2216,7 +2033,6 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
             </div>
           </div>
 
-          {/* あなたの組み合わせの場合の具体例 */}
           <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.6)", marginBottom:6, letterSpacing:"0.3px"}}>
             ✨ あなたの組み合わせの場合
           </div>
@@ -2240,14 +2056,13 @@ function OverallTabContent({ faceType, boneType, pc4, pc16, faceData, conflicts 
 }
 
 // ─────────────────────────────────────────────────────────────────
-// タブ2: 🦴 形（骨格別シルエット・素材・身長別tip）
+// タブ2: 🦴 形
 // ─────────────────────────────────────────────────────────────────
 function ShapeTabContent({ boneType, boneData }) {
   const boneVisual = BONE_TYPES.find(b => b.label === boneType);
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
-      {/* メインバナー */}
       <div style={{padding:"14px", borderRadius:14,
         background: boneVisual?.grad || "linear-gradient(135deg,#34d399,#06b6d4)",
         color:"#fff"}}>
@@ -2258,7 +2073,6 @@ function ShapeTabContent({ boneType, boneData }) {
         </div>
       </div>
 
-      {/* 似合う形 */}
       <div>
         <SectionHead icon="✓" label="似合う形・シルエット"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2270,7 +2084,6 @@ function ShapeTabContent({ boneType, boneData }) {
         </div>
       </div>
 
-      {/* 似合う素材 */}
       <div>
         <SectionHead icon="🧵" label="似合う素材"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2282,7 +2095,6 @@ function ShapeTabContent({ boneType, boneData }) {
         </div>
       </div>
 
-      {/* 苦手な形 */}
       <div>
         <SectionHead icon="✗" label="苦手な形"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2294,7 +2106,6 @@ function ShapeTabContent({ boneType, boneData }) {
         </div>
       </div>
 
-      {/* 春の鉄板コーデ */}
       <div style={{padding:"12px 14px", borderRadius:12,
         background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)"}}>
         <SectionHead icon="🌸" label="春の鉄板コーデ" color="#34d399"/>
@@ -2309,7 +2120,6 @@ function ShapeTabContent({ boneType, boneData }) {
         </div>
       </div>
 
-      {/* 身長別の調整 */}
       <div style={{padding:"12px 14px", borderRadius:12,
         background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
         <SectionHead icon="📏" label="身長別の調整"/>
@@ -2332,7 +2142,6 @@ function ShapeTabContent({ boneType, boneData }) {
         </div>
       </div>
 
-      {/* 2026年春トレンドとの相性 */}
       {boneData.spring2026Fit && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(244,114,182,0.06)", border:"1px solid rgba(244,114,182,0.22)"}}>
@@ -2364,12 +2173,11 @@ function ShapeTabContent({ boneType, boneData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// タブ3: 🎨 色（16PCサブタイプ選択 + パレット + トレンド色マッチ）
+// タブ3: 🎨 色
 // ─────────────────────────────────────────────────────────────────
 function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
   const pc4Visual = PC_TYPES.find(p => p.label === pc4);
 
-  // 2026年春の流行色のうち、自分のPCに似合うものを抽出
   const matchingTrendColors = pc16
     ? Object.entries(SPRING_2026_TREND_FIT.trendColorMatch || {})
         .filter(([color, pcs]) => pcs.includes(pc16))
@@ -2378,7 +2186,6 @@ function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
-      {/* メインバナー */}
       <div style={{padding:"14px", borderRadius:14,
         background: pc4Visual?.grad || "linear-gradient(135deg,#fb923c,#f43f5e)",
         color:"#fff"}}>
@@ -2394,7 +2201,6 @@ function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
         )}
       </div>
 
-      {/* 16PCサブタイプ選択 */}
       <div style={{padding:"12px 14px", borderRadius:12,
         background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
         <SectionHead icon="🎯" label="サブタイプを選び直す（16タイプ細分類）"/>
@@ -2426,7 +2232,6 @@ function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
         </div>
       </div>
 
-      {/* 選んだサブタイプの詳細 */}
       {pcData && (
         <>
           <div style={{padding:"12px 14px", borderRadius:12,
@@ -2474,7 +2279,6 @@ function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
         </>
       )}
 
-      {/* 2026春の流行色との相性 */}
       {matchingTrendColors.length > 0 && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(244,114,182,0.08)", border:"1px solid rgba(244,114,182,0.25)"}}>
@@ -2496,7 +2300,7 @@ function ColorTabContent({ pc4, pc16, pcData, pc16Options, setPc16 }) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// タブ4: 🌸 春（季節別コーデ・トレンド適合・4軸調整）
+// タブ4: 🌸 春
 // ─────────────────────────────────────────────────────────────────
 function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends }) {
   const [tipsOpen, setTipsOpen] = useState(false);
@@ -2507,7 +2311,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
-      {/* メインバナー */}
       <div style={{padding:"14px", borderRadius:14,
         background:"linear-gradient(135deg,#f472b6,#c084fc)", color:"#fff"}}>
         <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>
@@ -2523,7 +2326,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
         </div>
       </div>
 
-      {/* 骨格別コーデ例 */}
       {outfits.length > 0 && (
         <div>
           <SectionHead icon="☆" label={`${boneType}の${season}コーデ4選`} color="#f472b6"/>
@@ -2541,7 +2343,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
         </div>
       )}
 
-      {/* 春トレンド情報（春のみ） */}
       {isSpring && (
         <>
           <div>
@@ -2579,7 +2380,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
         </>
       )}
 
-      {/* あなたに似合うトレンド */}
       {goodTrends.length > 0 && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(52,211,153,0.06)", border:"1px solid rgba(52,211,153,0.2)"}}>
@@ -2594,7 +2394,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
         </div>
       )}
 
-      {/* 注意のトレンド + 調整法 */}
       {carefulTrends.length > 0 && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(251,191,36,0.06)", border:"1px solid rgba(251,191,36,0.22)"}}>
@@ -2620,7 +2419,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
         </div>
       )}
 
-      {/* 雰囲気別の組み方（春のみ） */}
       {isSpring && (
         <div style={{padding:"12px 14px", borderRadius:12,
           background:"rgba(192,132,252,0.08)",
@@ -2636,7 +2434,6 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
         </div>
       )}
 
-      {/* 4軸調整のコツ（折りたたみ） */}
       <div style={{borderRadius:12, overflow:"hidden",
         background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
         <button onClick={()=>setTipsOpen(o=>!o)} style={{
@@ -2676,14 +2473,13 @@ function SpringTabContent({ boneType, faceType, pc16, goodTrends, carefulTrends 
 }
 
 // ─────────────────────────────────────────────────────────────────
-// タブ5: ✂️ ヘア（顔タイプ別の髪型推奨）
+// タブ5: ✂️ ヘア
 // ─────────────────────────────────────────────────────────────────
 function HairTabContent({ faceType, faceData }) {
   const hair = faceData.hair;
 
   return (
     <div style={{display:"flex", flexDirection:"column", gap:14}}>
-      {/* メインバナー */}
       <div style={{padding:"14px", borderRadius:14,
         background:"linear-gradient(135deg,#14b8a6,#06b6d4)", color:"#fff"}}>
         <div style={{fontSize:11, opacity:0.85, fontWeight:700}}>
@@ -2697,7 +2493,6 @@ function HairTabContent({ faceType, faceData }) {
         </div>
       </div>
 
-      {/* おすすめスタイル */}
       <div>
         <SectionHead icon="💇" label="おすすめのスタイル" color="#14b8a6"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2707,7 +2502,6 @@ function HairTabContent({ faceType, faceData }) {
         </div>
       </div>
 
-      {/* 前髪 */}
       <div>
         <SectionHead icon="✨" label="似合う前髪"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2717,7 +2511,6 @@ function HairTabContent({ faceType, faceData }) {
         </div>
       </div>
 
-      {/* 巻き */}
       <div style={{padding:"10px 12px", borderRadius:10,
         background:"rgba(255,255,255,0.04)", border:"1px solid rgba(255,255,255,0.08)"}}>
         <div style={{fontSize:10, fontWeight:800, color:"rgba(255,255,255,0.5)", marginBottom:4}}>
@@ -2728,7 +2521,6 @@ function HairTabContent({ faceType, faceData }) {
         </div>
       </div>
 
-      {/* カラー */}
       <div>
         <SectionHead icon="🎨" label="似合うヘアカラー"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2738,7 +2530,6 @@ function HairTabContent({ faceType, faceData }) {
         </div>
       </div>
 
-      {/* 避けたい */}
       <div>
         <SectionHead icon="✗" label="避けたい髪型" color="#f87171"/>
         <div style={{display:"flex", flexWrap:"wrap", gap:5}}>
@@ -2750,7 +2541,6 @@ function HairTabContent({ faceType, faceData }) {
         </div>
       </div>
 
-      {/* 2026年春の旬ヘアトレンド（全タイプ共通） */}
       <div style={{padding:"12px 14px", borderRadius:12,
         background:"rgba(244,114,182,0.08)", border:"1px solid rgba(244,114,182,0.25)"}}>
         <SectionHead icon="🌸" label="2026年春の旬ヘアトレンド" color="#f472b6"/>
