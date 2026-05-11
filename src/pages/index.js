@@ -21,6 +21,7 @@ export default function Home() {
         {/* ─── 基本メタ情報 ─── */}
         <title>{SITE_CONFIG.title}</title>
         <meta name="description" content={SITE_CONFIG.description} />
+        <meta name="google-site-verification" content="TjB2BgtqcchYT6THDW4V95zyYkyRSkQmaO9-CJVX7LM" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <meta name="theme-color" content={SITE_CONFIG.themeColor} />
         <meta charSet="utf-8" />
